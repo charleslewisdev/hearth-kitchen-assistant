@@ -69,11 +69,32 @@ The single most important architectural rule: **AI is an enhancement, never a de
 - **Testing (first-class — see Decision 11):** the deterministic core (scaling, unit conversion, shopping aggregation, food-mapping, parsers, receipt itemization) is built **test-first (TDD)** with thorough unit suites and is testable with no network/AI. Typed contracts (tRPC + zod) plus tests at the domain-service boundary. **CI gates on green** before any merge.
 - **Observability:** minimal by default (non-technical users), with opt-in logging for power users.
 
-## Open architectural questions (resolved during deep brainstorm)
+## Monorepo layout (Decision 23)
 
-1. **Recipe storage format** — Markdown + frontmatter vs. fully structured relational vs. Cooklang-style canonical form. *First major brainstorm decision.*
-2. Monorepo layout & package boundaries (client / server / shared types / enrichment).
-3. Where the deterministic/LLM line falls for each enrichment task.
-4. Sale-ad ingestion architecture (tiered: manual upload → structured feed → scraping).
-5. Receipt parsing pipeline and how it links to budget analytics.
-6. Whether a Python sidecar is needed at all, and for which tasks.
+pnpm workspaces:
+
+```
+packages/shared      pure domain logic (scale, units, aggregation) + Zod schemas — the TDD core
+packages/enrichment  import / OCR / receipt providers behind the enrichment interface
+apps/server          Fastify + tRPC + Better Auth + Drizzle ORM + Postgres
+apps/web             React + Vite PWA
+```
+
+Pure, side-effect-free domain logic lives in `packages/shared` so it can be exhaustively unit-tested in isolation (Vitest). ORM: **Drizzle** (SQL-first, strong types, suits tenant-scoped queries). **No Python sidecar initially** — tesseract.js, JS recipe-scrapers, and JS PDF parsing keep us single-language; revisit only if they prove insufficient.
+
+## Open architectural questions
+
+Resolved during the 2026-06-17 deep brainstorm (see [DECISION_LOG.md](DECISION_LOG.md)):
+
+- ✅ Recipe storage format → structured core (D9)
+- ✅ Monorepo layout & package boundaries → D23
+- ✅ Deterministic/LLM line per task → D14
+- ✅ Sale-ad ingestion architecture → D18 (tiered)
+- ✅ Receipt parsing pipeline + budget link → D19
+- ✅ Python sidecar? → D23 (no, not initially)
+
+Still open (for later specs):
+
+- Exact Better Auth ↔ Drizzle integration and session/OIDC config details.
+- Row-Level Security vs. app-layer-only tenant scoping (defense-in-depth call).
+- PWA offline-sync conflict-resolution strategy.

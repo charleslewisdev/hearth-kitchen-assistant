@@ -15,6 +15,7 @@ Start here, in order:
 3. [Architecture & Tech Posture](docs/ARCHITECTURE.md) — stack, auth, multi-tenancy, AI-optional boundary.
 4. [Roadmap](docs/ROADMAP.md) — phased milestones, living across sessions.
 5. [Decision Log](docs/DECISION_LOG.md) — every locked decision and its rationale.
+6. [Inspiration & "Borrow From" Map](docs/INSPIRATION.md) — what to learn from each FOSS project.
 
 Per-slice design specs live in [`docs/superpowers/specs/`](docs/superpowers/specs/).
 
@@ -26,4 +27,4 @@ Per-slice design specs live in [`docs/superpowers/specs/`](docs/superpowers/spec
 | **Auth** | Better Auth (embedded) + optional OIDC; Organizations = household/tenant |
 | **Tenancy** | Single-household first, multi-tenant-ready by design |
 | **Deploy** | `docker compose up` (app + Postgres) |
-| **License** | TBD (see Decision Log) |
+| **License** | AGPL-3.0 (author retains copyright; dual-license-ready) |

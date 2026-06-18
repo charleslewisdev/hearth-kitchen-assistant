@@ -54,21 +54,26 @@ Multi-tenant hardening · data-portability/export · offline/PWA polish · acces
 
 ## Open questions backlog
 
-Tracked here until resolved in a brainstorm or spec; resolutions move to [DECISION_LOG.md](DECISION_LOG.md).
+Resolved in the 2026-06-17 deep brainstorm (→ [DECISION_LOG.md](DECISION_LOG.md)):
 
-1. **Recipe storage format** — Markdown+frontmatter vs structured relational vs Cooklang canonical. *(next up)*
-2. Exact search/filter set (which filters ship in MVP).
-3. Per-task deterministic-vs-LLM line (import, OCR, receipts).
-4. External services/dependencies (OCR engine, scraping libs, LLM providers).
-5. Per-ingredient scaling-rule model (how rules are expressed/stored).
-6. Sale-ad ingestion formats and tier-1 scope.
-7. Receipt parsing approach + itemization depth.
-8. Inventory/pantry tracking — in scope, and how deep?
-9. License choice (AGPL vs MIT vs other).
-10. Which "borrow from" patterns/UI inspirations to adopt per project (Mealie/Tandoor/Grocy/KitchenOwl/Cooklang).
+1. ✅ Recipe storage format → structured core (D9)
+2. ✅ Search/filter set → Postgres FTS + ingredient/meal-of-day/tag MVP (D16)
+3. ✅ Deterministic-vs-LLM line → core deterministic, import/receipts optional-LLM (D14)
+4. ✅ External services/deps → tesseract.js, JS scrapers, optional LLM, no Python sidecar (D14, D23)
+5. ✅ Scaling-rule model → `scalingMode` enum + smart defaults (D12)
+6. ✅ Sale-ad ingestion → tiered, T1 structured import (D18)
+7. ✅ Receipt parsing → enrichment + learned aliases + full budget loop (D19)
+8. ✅ Inventory/pantry → lightweight opt-in (D20)
+9. ✅ License → AGPL-3.0, copyright-retained (D21)
+10. ✅ Borrow-from / UI inspiration → see [INSPIRATION.md](INSPIRATION.md)
+
+Still open (next sessions):
+
+- **UI/layout design** for the key screens (recipe view, cook mode, planner calendar, shopping list, import flow) — to be done with the visual companion.
+- Better Auth ↔ Drizzle integration specifics; RLS vs app-layer tenant scoping; PWA offline-sync conflict resolution (deferred to P0/relevant specs).
 
 ## Session log
 
 Append a short entry per working session so context survives across months.
 
-- **2026-06-17** — Ran FOSS landscape research (deep-research, 101 agents). Decided to build Hearth. Locked: TS full-stack, React/Vite PWA + Fastify/tRPC + Postgres, Better Auth + optional OIDC, single-tenant-first/MT-ready. Authored north-star docs. Next: deep feature brainstorm starting with recipe format.
+- **2026-06-17** — Ran FOSS landscape research (deep-research, 101 agents). Decided to build Hearth. Locked: TS full-stack, React/Vite PWA + Fastify/tRPC + Postgres, Better Auth + optional OIDC, single-tenant-first/MT-ready. Authored north-star docs. Then ran a deep feature brainstorm → **Decisions 9–23**: structured-core recipe model, canonical Food entity, scaling rules, unit system, deterministic/LLM boundary, portion ledger (leftovers/freezer/freshness), search+filters, shopping-list sorting, tiered sale ads, full receipt→budget loop, opt-in pantry, AGPL-3.0, magic-link sharing, pnpm monorepo skeleton. Wrote [INSPIRATION.md](INSPIRATION.md). **Next: UI/layout design with the visual companion, then write the P0/P1 spec and move to writing-plans.**
