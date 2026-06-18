@@ -76,9 +76,18 @@ Still open (next sessions):
 - Better Auth ↔ Drizzle integration specifics; RLS vs app-layer tenant scoping; PWA offline-sync conflict resolution (deferred to P0/relevant specs).
 - Exact design-token ramps, spacing scale, dark-theme values (settled during implementation).
 
+Surfaced by the 2026-06-18 P0 plan stress test (details + rationale in [DECISION_LOG.md](DECISION_LOG.md#pending-decisions)):
+
+- **Audience-vs-delivery tension** — non-technical primary audience vs self-host-only delivery; is the honest near-term audience the homelab secondary?
+- **Solo-build scope / "dogfood line"** — differentiators (P4/P6/P7) are hardest and last; define the minimal weekly-use slice and pull one differentiator forward as an early proof.
+- **Sale-ad T1 input availability** — validate that any real store ships structured sale data before committing the P6 architecture, or it falls through to LLM and breaks deterministic-first.
+- **Data export scheduling** — pull a basic structured export earlier than P5 to honor "no lock-in" before early adopters can churn.
+- **`docker compose up` P0 exit reconciliation** — the P0 plan ships db-in-compose only; decide whether full one-command app deploy + TLS is in P0 or P0.5.
+
 ## Session log
 
 Append a short entry per working session so context survives across months.
 
 - **2026-06-17** — Ran FOSS landscape research (deep-research, 101 agents). Decided to build Hearth. Locked: TS full-stack, React/Vite PWA + Fastify/tRPC + Postgres, Better Auth + optional OIDC, single-tenant-first/MT-ready. Authored north-star docs. Then ran a deep feature brainstorm → **Decisions 9–23**: structured-core recipe model, canonical Food entity, scaling rules, unit system, deterministic/LLM boundary, portion ledger (leftovers/freezer/freshness), search+filters, shopping-list sorting, tiered sale ads, full receipt→budget loop, opt-in pantry, AGPL-3.0, magic-link sharing, pnpm monorepo skeleton. Wrote [INSPIRATION.md](INSPIRATION.md).
+- **2026-06-18** — Stress-tested the P0 foundations plan before execution. Folded execution-affecting fixes inline into the plan (Better Auth/Fastify Set-Cookie + spike-first, cross-origin→Vite proxy, missing onboarding slice, ESLint JSX, dotenv path, tenant-isolation lint guard + RLS decision, disposable-`recipes`-table note, `docker compose up` exit-criterion mismatch). Logged five strategic open questions (audience-vs-self-host, solo-build scope/dogfood line, sale-ad T1 input, earlier data export, RLS) to the Decision Log pending section + this backlog. **Next: execute the P0 plan in a fresh session.**
 - **2026-06-17 (cont.)** — UI/layout design session with the visual companion. Designed all five priority screens + the shared design system + responsive app shell → **Decisions 24–30** and the [UI/UX design spec](superpowers/specs/2026-06-17-ui-design-p0-p1-design.md): Fresh Market theme on semantic design tokens (swappable themes + dark mode), bottom-tabs⇄left-rail shell, segmented recipe view + single-scroll Focus cook mode (wake lock, stacking timer tray, ingredient peek), week-agenda planner with source-coded slots + "use what you have" picker, department-grouped sink-away shopping list, source-tile import with confidence-flagged review, library with chips + smart-search tokens. **Next: writing-plans to turn the UI spec (with the P0/P1 backlog) into an implementation plan.**

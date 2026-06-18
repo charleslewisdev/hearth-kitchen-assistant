@@ -39,7 +39,12 @@ _Last updated: 2026-06-17 (decisions 24–30 added: UI/UX design)_
 
 ## Pending decisions
 
-See the [Roadmap open-questions backlog](ROADMAP.md#open-questions-backlog). Notable near-term:
+See the [Roadmap open-questions backlog](ROADMAP.md#open-questions-backlog). (The previously-listed "recipe storage format" and "license" pending items are now resolved — D9 and D21.)
 
-- **Recipe storage format** (next brainstorm topic).
-- **License** (AGPL vs MIT vs other) — affects how others can build on Hearth and whether a hosted commercial instance is viable.
+Surfaced by the 2026-06-18 P0 plan stress test — strategic, larger than P0; answer before the phases that depend on them:
+
+- **Audience-vs-delivery tension.** Primary audience is explicitly *non-technical*, but the only delivery path is *self-host* (Docker, a box, TLS, port-forwarding) — an intrinsically technical act. "Or a hosted account, later" (PRODUCT_VISION) carries enormous load. Decide the honest near-term audience: is it really the homelab secondary, with "everyone" gated on a future hosted instance? This reframing changes whether public sign-up / email-verification / billing / onboarding are foundational rather than "cross-cutting later."
+- **Solo-build scope & the "dogfood line."** P0–P7 is several startups stacked, and the differentiators that justify the project (P4 scaling/freezer, P6 sale ads, P7 budget) are the hardest *and* scheduled last — burnout/abandonment risk before the moat is reached. Define the minimal slice you'd personally use weekly (likely P1 + P3) as the dogfood line, treat the rest as bets, and consider pulling one differentiator forward as an early vertical proof.
+- **Sale-ad T1 input availability (affects P6 architecture).** T1 (D18) assumes stores publish structured (CSV/JSON) sale data; few do for consumers. If real T1 input is near-zero, the headline differentiator falls through to T2 (OCR/LLM) and breaks "deterministic-first." Validate that at least one real store provides T1-shape data before committing the architecture.
+- **Pull data export earlier (supports Principle #1 "no lock-in").** Export is currently unscheduled ("cross-cutting/ongoing") while P0 sets `household → recipes` cascade-delete. An early adopter who churns before export exists loses everything. Schedule a basic structured export sooner than P5.
+- **RLS vs app-layer-only tenancy (decide at P0; see plan Task 7).** Defense-in-depth that survives a coding mistake; cheapest to adopt while one domain table exists. App-layer scoping + a `no-restricted-imports` lint guard are in the P0 plan; the RLS call should be made consciously, not deferred by default.

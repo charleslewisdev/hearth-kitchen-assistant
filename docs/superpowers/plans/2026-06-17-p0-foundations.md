@@ -22,6 +22,26 @@
 
 ---
 
+## Risks & decisions to confirm before executing (read first)
+
+A stress test of this plan (2026-06-18) surfaced the following. Each is also flagged inline at the task where it bites — this list is the index.
+
+**Validate before you trust the plan:**
+
+- **🔴 Spike the Better Auth ↔ Fastify integration first (Task 6).** Highest-uncertainty, highest-dependency piece: every task after 6 assumes a working sign-up → cookie → session round-trip *in a real browser*. Prove it in isolation before building on it. Prefer Better Auth's documented Node/Fastify handler over the hand-rolled `Request` adapter, and forward `Set-Cookie` via `res.headers.getSetCookie()` (a Web `Headers` object comma-joins multiple Set-Cookie values and corrupts the session cookie).
+- **🔴 Cross-origin cookies between `:5173` and `:3000` will not work in the browser (Tasks 9, 10).** Default `SameSite=Lax` cookies are not sent on cross-site fetch, so the in-process `app.inject` tests pass while the real browser session silently fails. Serve the API through a **Vite dev proxy** so the browser sees same-origin relative URLs.
+- **🔴 P0 has no onboarding path (Task 10).** A fresh user can sign in but there is no sign-up, no create-household, no set-active-organization in the UI — so they hit `FORBIDDEN` with no way out. The "land in a household" exit criterion is otherwise met only by the test harness. Task 10 now includes the onboarding slice.
+
+**Decisions to make consciously (cheap now, expensive later):**
+
+- **🟠 Tenant isolation is enforced by repo-layer convention, not structurally (Task 7).** One forgotten `where(householdId)` leaks across households. Decide *now*: add the `no-restricted-imports` lint guard (Task 7 Step 6), and either adopt Postgres **Row-Level Security** as defense-in-depth or consciously defer it with reasons. Retrofitting RLS after ~15 tables exist is the expensive path.
+- **🟠 The P0 `recipes` table is disposable scaffolding, not the Decision 9 structured-core model.** It proves the stack end-to-end; P1 replaces it. Treat it as throwaway to avoid sunk-cost attachment.
+- **🟠 "Deployed via `docker compose up`" is not delivered by P0 as written.** Compose contains Postgres only; server + web run via `pnpm dev`, with no app container, migrate-on-boot, or TLS. Either pull app containerization into P0 or amend the ROADMAP P0 exit criterion to match. For a non-technical-first product whose #1 principle is one-command install, this is a scope decision, not a footnote. See Exit Criterion.
+
+**Strategic questions (bigger than P0)** are logged in [DECISION_LOG.md](../../DECISION_LOG.md) (pending section) + the [ROADMAP.md](../../ROADMAP.md) backlog — they don't block P0 but should be answered before the phases that depend on them: the non-technical-audience-vs-self-host tension, solo-build scope / "dogfood line", sale-ad T1 input availability, and pulling data export earlier.
+
+---
+
 ## File Structure
 
 ```
@@ -157,9 +177,10 @@ export default ['packages/*', 'apps/*'];
 module.exports = {
   root: true,
   parser: '@typescript-eslint/parser',
+  parserOptions: { ecmaVersion: 2022, sourceType: 'module', ecmaFeatures: { jsx: true } },
   plugins: ['@typescript-eslint'],
   extends: ['eslint:recommended', 'plugin:@typescript-eslint/recommended'],
-  env: { node: true, es2022: true },
+  env: { node: true, browser: true, es2022: true },
   ignorePatterns: ['dist', 'node_modules', '*.config.*'],
 };
 ```
@@ -168,6 +189,8 @@ module.exports = {
 // .prettierrc
 { "singleQuote": true, "semi": true, "printWidth": 100 }
 ```
+
+> ⚠️ `ecmaFeatures.jsx` is required or ESLint throws when parsing the `.tsx` files added in Tasks 9–10 (a CI lint gate). Add `eslint-plugin-react-hooks` later if you want hook-rule coverage.
 
 - [ ] **Step 6: Append to `.gitignore`**
 
@@ -471,7 +494,11 @@ Expected: PASS. (Test sets `NODE_ENV=test` via Vitest default; the env loader ne
 ```ts
 import { defineConfig } from 'vitest/config';
 import { config } from 'dotenv';
-config({ path: '../../.env' });
+import { fileURLToPath } from 'node:url';
+// Resolve relative to THIS file, not process.cwd(): root `pnpm test` runs from the repo root,
+// where '../../.env' would point above the repo. In CI there is no .env file and the vars come
+// from the job env, so dotenv is a harmless no-op there.
+config({ path: fileURLToPath(new URL('../../.env', import.meta.url)) });
 
 export default defineConfig({ test: { environment: 'node' } });
 ```
@@ -488,6 +515,10 @@ git commit -m "feat(server): fastify skeleton with health route and test"
 ---
 
 ### Task 5: Drizzle client, Better Auth schema, domain schema, migration
+
+> ℹ️ The `recipes` table here is **disposable scaffolding to prove the stack end-to-end — not** the Decision 9 structured-core recipe model (ingredients, steps, canonical Foods, scaling rules). P1 replaces it. Don't over-invest in or grow attached to this shape.
+>
+> Note also: drizzle-kit owns the Better Auth tables' migrations here (not the Better Auth CLI). Every Better Auth version bump means re-running `generate` and reconciling the schema diff by hand.
 
 **Files:**
 - Create: `apps/server/drizzle.config.ts`, `apps/server/src/db/client.ts`, `apps/server/src/db/auth-schema.ts` (generated), `apps/server/src/db/schema.ts`
@@ -571,6 +602,8 @@ git commit -m "feat(server): drizzle client, better-auth schema, recipes table, 
 
 ### Task 6: Better Auth instance (email/password + organizations) on Fastify
 
+> 🔴 **Spike this in isolation before building on it.** Every later task assumes a working sign-up → session-cookie → `getSession` round-trip *in a real browser* (not just `app.inject`). Prove that first. Strongly prefer Better Auth's documented Node/Fastify integration over the hand-rolled `Request` adapter below — the adapter is the single most failure-prone piece in this plan. If you keep the hand-rolled path, the `Set-Cookie` handling in Step 2 is mandatory, not optional.
+
 **Files:**
 - Create: `apps/server/src/auth.ts`
 - Modify: `apps/server/src/server.ts` (mount the auth handler at `/api/auth/*`)
@@ -622,13 +655,18 @@ app.route({
     });
     const res = await auth.handler(request);
     reply.status(res.status);
-    res.headers.forEach((value, key) => reply.header(key, value));
+    // A Web `Headers` object merges multiple Set-Cookie values into one comma-joined
+    // string, which corrupts the session cookie. Forward them explicitly.
+    for (const cookie of res.headers.getSetCookie()) reply.header('set-cookie', cookie);
+    res.headers.forEach((value, key) => {
+      if (key.toLowerCase() !== 'set-cookie') reply.header(key, value);
+    });
     reply.send(res.body ? await res.text() : null);
   },
 });
 ```
 
-> Add `app.addContentTypeParser` for JSON if Fastify's default body parsing interferes; Better Auth expects the raw JSON body re-serialized as above.
+> Add `app.addContentTypeParser` for JSON if Fastify's default body parsing interferes; Better Auth expects the raw JSON body re-serialized as above. Re-serializing only works for JSON bodies — if any auth route uses a non-JSON content type this breaks, which is the other reason to prefer the official Node/Fastify handler.
 
 - [ ] **Step 3: Write the failing integration test — append to `apps/server/src/server.test.ts`**
 
@@ -681,6 +719,8 @@ git commit -m "feat(server): better-auth email/password + organizations mounted 
 ### Task 7: Household-scoped recipe repository (tenant isolation)
 
 The structural guarantee from the Global Constraints: domain access only through this layer, always parameterized by `householdId`.
+
+> 🟠 **This guarantee is convention, not structure, unless you enforce it.** Nothing stops a future router from importing `db` and forgetting `.where(householdId)` — one such slip leaks data across households. Step 6 adds a lint guard. Decide now whether to also adopt Postgres **Row-Level Security** as defense-in-depth (survives a coding mistake; cheapest to adopt while only one domain table exists) or to consciously defer it — record the call in the Decision Log either way. Consider a branded `type HouseholdId = string & { readonly __brand: 'HouseholdId' }` so the wrong string can't be passed positionally.
 
 **Files:**
 - Create: `apps/server/src/repo/recipes.ts`
@@ -796,10 +836,31 @@ export async function getRecipe(householdId: string, id: string): Promise<Recipe
 Run: `pnpm vitest run apps/server/src/repo/recipes.test.ts`
 Expected: PASS (3 tests) — isolation proven.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: Add the import guard that makes tenancy structural**
+
+In `.eslintrc.cjs`, restrict importing the raw `db` client outside the repo/db layer so domain queries cannot bypass household scoping:
+
+```js
+// add to module.exports in .eslintrc.cjs
+overrides: [
+  {
+    files: ['apps/server/src/**/*.ts'],
+    excludedFiles: ['apps/server/src/repo/**', 'apps/server/src/db/**'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [{ group: ['**/db/client'], message: 'Domain access must go through src/repo/* (household-scoped).' }],
+      }],
+    },
+  },
+],
+```
+
+Run `pnpm lint`; expect it to flag any non-repo import of `db` (there should be none yet).
+
+- [ ] **Step 7: Commit**
 
 ```bash
-git add apps/server/src/repo apps/server/test/factories.ts
+git add apps/server/src/repo apps/server/test/factories.ts .eslintrc.cjs
 git commit -m "feat(server): household-scoped recipe repository with isolation tests"
 ```
 
@@ -1025,7 +1086,16 @@ import { VitePWA } from 'vite-plugin-pwa';
 export default defineConfig({
   plugins: [react(), VitePWA({ registerType: 'autoUpdate', manifest: { name: 'Hearth', short_name: 'Hearth', theme_color: '#2E9E5B', display: 'standalone' } })],
   test: { environment: 'jsdom', setupFiles: ['./src/test-setup.ts'] },
-  server: { port: 5173 },
+  server: {
+    port: 5173,
+    // Proxy API + auth to the server so the browser sees ONE origin. Cross-origin
+    // (:5173 -> :3000) breaks Better Auth's SameSite=Lax session cookie in the browser
+    // even though in-process app.inject tests pass. Keep client URLs relative (Task 10).
+    proxy: {
+      '/api': { target: 'http://localhost:3000', changeOrigin: true },
+      '/trpc': { target: 'http://localhost:3000', changeOrigin: true },
+    },
+  },
 });
 ```
 
@@ -1169,12 +1239,12 @@ git commit -m "feat(web): vite pwa scaffold, fresh-market tokens, light/dark the
 
 ---
 
-### Task 10: Web vertical slice — auth client, tRPC client, app shell, recipes screen
+### Task 10: Web vertical slice — auth client, tRPC client, app shell, onboarding, recipes screen
 
-Implements UI spec §1 app shell (Decision 25) at minimal fidelity and proves the full stack end-to-end (sign in → see/add household-scoped recipes).
+Implements UI spec §1 app shell (Decision 25) at minimal fidelity and proves the full stack end-to-end (**sign up → create household → set it active →** see/add household-scoped recipes). The onboarding slice is required: without it a fresh user signs in, has no active organization, and hits `FORBIDDEN` from `protectedProcedure` with no UI path forward.
 
 **Files:**
-- Create: `apps/web/src/lib/auth.ts`, `apps/web/src/lib/trpc.ts`, `apps/web/src/app/AppShell.tsx`, `apps/web/src/app/AppShell.module.css`, `apps/web/src/routes/SignIn.tsx`, `apps/web/src/routes/Recipes.tsx`
+- Create: `apps/web/src/lib/auth.ts`, `apps/web/src/lib/trpc.ts`, `apps/web/src/app/AppShell.tsx`, `apps/web/src/app/AppShell.module.css`, `apps/web/src/routes/SignIn.tsx`, `apps/web/src/routes/Onboarding.tsx`, `apps/web/src/routes/Recipes.tsx`
 - Modify: `apps/web/src/App.tsx` (replace placeholder with the auth gate)
 - Test: `apps/web/src/app/AppShell.test.tsx`
 
@@ -1191,8 +1261,10 @@ Implements UI spec §1 app shell (Decision 25) at minimal fidelity and proves th
 import { createAuthClient } from 'better-auth/react';
 import { organizationClient } from 'better-auth/client/plugins';
 
+// Same-origin: the Vite dev proxy (and the prod reverse proxy) forward /api/auth to the
+// server. Absolute cross-origin URLs would break the session cookie in the browser.
 export const authClient = createAuthClient({
-  baseURL: 'http://localhost:3000',
+  baseURL: window.location.origin,
   plugins: [organizationClient()],
 });
 ```
@@ -1207,7 +1279,8 @@ import type { AppRouter } from '@hearth/server/src/trpc/routers';
 export const trpc = createTRPCReact<AppRouter>();
 
 export const trpcClient = trpc.createClient({
-  links: [httpBatchLink({ url: 'http://localhost:3000/trpc', fetch: (u, o) => fetch(u, { ...o, credentials: 'include' }) })],
+  // Relative URL -> goes through the Vite proxy (dev) / reverse proxy (prod), same origin.
+  links: [httpBatchLink({ url: '/trpc', fetch: (u, o) => fetch(u, { ...o, credentials: 'include' }) })],
 });
 ```
 
@@ -1302,21 +1375,32 @@ Expected: FAIL (no module) → after Step 3 already exists, PASS. (If authored t
 import { useState } from 'react';
 import { authClient } from '../lib/auth';
 
+// Minimal combined sign-in / create-account. A fresh self-host install has no users,
+// so create-account must be reachable from the first screen (non-technical-first).
 export function SignIn() {
+  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const res = await authClient.signIn.email({ email, password });
-    if (res.error) setError(res.error.message ?? 'Sign in failed');
+    setError(null);
+    const res =
+      mode === 'signin'
+        ? await authClient.signIn.email({ email, password })
+        : await authClient.signUp.email({ email, password, name: email });
+    if (res.error) setError(res.error.message ?? 'Failed');
   }
   return (
     <form onSubmit={submit} style={{ maxWidth: 320, margin: '60px auto', display: 'grid', gap: 10 }}>
-      <h1>Sign in to Hearth</h1>
+      <h1>{mode === 'signin' ? 'Sign in to Hearth' : 'Create your Hearth account'}</h1>
       <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
       <input placeholder="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-      <button type="submit">Sign in</button>
+      <button type="submit">{mode === 'signin' ? 'Sign in' : 'Create account'}</button>
+      <button type="button" onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
+        style={{ background: 'none', border: 'none', color: 'var(--color-accent-soft-text)' }}>
+        {mode === 'signin' ? 'Create an account' : 'Have an account? Sign in'}
+      </button>
       {error && <p role="alert">{error}</p>}
     </form>
   );
@@ -1347,7 +1431,42 @@ export function Recipes() {
 }
 ```
 
-- [ ] **Step 8: Replace `apps/web/src/App.tsx` with the auth gate**
+- [ ] **Step 7b: Create `apps/web/src/routes/Onboarding.tsx` (create + activate the first household)**
+
+```tsx
+import { useState } from 'react';
+import { authClient } from '../lib/auth';
+import { slugify } from '@hearth/shared';
+
+// Shown when a user is signed in but has no active household. Creating the org and
+// setting it active is what makes protectedProcedure stop returning FORBIDDEN.
+export function Onboarding() {
+  const [name, setName] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    const created = await authClient.organization.create({ name, slug: slugify(name) || 'home' });
+    if (created.error) return setError(created.error.message ?? 'Could not create household');
+    const activated = await authClient.organization.setActive({ organizationId: created.data.id });
+    if (activated.error) setError(activated.error.message ?? 'Could not activate household');
+    // useActiveOrganization() in App re-renders into the app shell on success.
+  }
+  return (
+    <form onSubmit={submit} style={{ maxWidth: 320, margin: '60px auto', display: 'grid', gap: 10 }}>
+      <h1>Name your household</h1>
+      <p style={{ color: 'var(--color-text-muted)' }}>Everything in Hearth — recipes, plans, lists — lives in a household.</p>
+      <input placeholder="e.g. The Smith Kitchen" value={name} onChange={(e) => setName(e.target.value)} />
+      <button type="submit" disabled={!name}>Create household</button>
+      {error && <p role="alert">{error}</p>}
+    </form>
+  );
+}
+```
+
+> Verify the exact org-client method names against your Better Auth version (`authClient.organization.create` / `.setActive`). Confirm whether `create` already sets the org active — if it does, the explicit `setActive` is a harmless no-op; if it doesn't, it's required (and the same question applies to the server-side test in Task 8).
+
+- [ ] **Step 8: Replace `apps/web/src/App.tsx` with the auth + onboarding gate**
 
 ```tsx
 import { useState } from 'react';
@@ -1356,15 +1475,19 @@ import { trpc, trpcClient } from './lib/trpc';
 import { authClient } from './lib/auth';
 import { AppShell } from './app/AppShell';
 import { SignIn } from './routes/SignIn';
+import { Onboarding } from './routes/Onboarding';
 import { Recipes } from './routes/Recipes';
 
 const queryClient = new QueryClient();
 
 export function App() {
   const { data: session, isPending } = authClient.useSession();
+  const { data: activeOrg, isPending: orgPending } = authClient.useActiveOrganization();
   const [active, setActive] = useState('recipes');
   if (isPending) return null;
   if (!session) return <SignIn />;
+  if (orgPending) return null;
+  if (!activeOrg) return <Onboarding />; // signed in but no household yet
   return (
     <trpc.Provider client={trpcClient} queryClient={queryClient}>
       <QueryClientProvider client={queryClient}>
@@ -1380,8 +1503,8 @@ export function App() {
 - [ ] **Step 9: Manual end-to-end verification**
 
 Run (three terminals): `docker compose up -d db` · `pnpm --filter @hearth/server dev` · `pnpm --filter @hearth/web dev`
-Then in the browser at `http://localhost:5173`: sign up (via the auth client — temporarily call `authClient.signUp.email` or use the API), create a household, add a recipe "White Bean Soup", reload.
-Expected: the recipe persists and the app shell shows a bottom bar at phone width and a left rail at ≥768px.
+Then in the browser at `http://localhost:5173`: **create an account → name your household → add a recipe "White Bean Soup" → reload.** Do the whole flow through the UI (this is the real onboarding path, not a test shortcut). Then open a second account in a private window and confirm it does **not** see the first household's recipe (manual tenant-isolation check).
+Expected: the session survives reload (proves the same-origin proxy + cookie work), the recipe persists, the second account sees an empty list, and the app shell shows a bottom bar at phone width and a left rail at ≥768px.
 
 - [ ] **Step 10: Commit**
 
@@ -1460,7 +1583,9 @@ Expected after push: the CI job passes on GitHub (gates future merges).
 
 ## Exit Criterion (maps to ROADMAP P0)
 
-When this plan is complete: a user can `docker compose up`, sign in to the React PWA, land in a household, and create/list recipes that are **provably isolated to their household** (Task 7 tests), through a typed tRPC API — with the Fresh Market app shell rendering responsively and **CI gating on green** (Task 11).
+When this plan is complete: a user can start Postgres via `docker compose up -d db`, run the server and web (`pnpm dev`), **create an account, name a household, and create/list recipes that are provably isolated to their household** (Task 7 tests + the Step 9 manual check), through a typed tRPC API — with the Fresh Market app shell rendering responsively and **CI gating on green** (Task 11).
+
+> ⚠️ **Scope mismatch to resolve before calling P0 "done."** The ROADMAP P0 exit says "deployed via `docker compose up`" — *one* command, app included. This plan ships Postgres in compose but runs server + web via `pnpm dev`, with no app container, migrate-on-boot, or TLS/HTTPS. For a product whose #1 principle is one-command install for non-technical users, that gap is the headline, not a detail. Decide explicitly: (a) add `apps/server` + `apps/web` Dockerfiles, a migrate-on-boot step, and a reverse proxy (e.g. Caddy for automatic TLS) to compose as a final P0 task, or (b) amend the ROADMAP P0 exit criterion to "dev-runnable; full one-command deploy is P0.5." Don't let it pass silently.
 
 ## Self-Review notes (coverage vs. ROADMAP P0 + UI spec foundations)
 
@@ -1473,4 +1598,4 @@ When this plan is complete: a user can `docker compose up`, sign in to the React
 - **Docker one-command deploy (J3):** Task 3 compose (db); app containerization can extend the same compose file in a later phase (noted, not required for P0 exit). ✓
 - **Design tokens + app shell (Decisions 24, 25):** Tasks 9, 10. ✓
 - **Resolves open question** "Better Auth ↔ Drizzle integration": Better Auth Drizzle adapter owns auth/org tables; domain tables FK to `organization.id`. ✓
-- **Deferred (correctly out of P0 scope):** RLS-vs-app-layer defense-in-depth (app-layer enforced here; RLS revisited in the data-model spec), PWA offline-sync conflict resolution, and the five feature screens (next plan, P1).
+- **Deferred (revisit explicitly, not silently):** RLS-vs-app-layer defense-in-depth (app-layer + lint guard enforced here; decide RLS *now* per the Task 7 note, don't just punt to the data-model spec), full one-command `docker compose up` app deploy + TLS (see Exit Criterion), PWA offline-sync conflict resolution, email verification + auth rate-limiting + first-boot secret generation (needed before any public/multi-tenant instance), and the five feature screens (next plan, P1).
