@@ -66,7 +66,7 @@ The single most important architectural rule: **AI is an enhancement, never a de
 
 - **Data portability:** export everything (recipes as Markdown/structured, full account export). A first-class feature, not an afterthought — it backs the "no lock-in" principle.
 - **Offline:** the cooking/viewing/shopping-list paths should work without connectivity (PWA service worker + local cache). Sync on reconnect.
-- **Testing:** typed contracts (tRPC + zod) plus tests at the domain-service boundary; the deterministic enrichment baselines must be testable without network.
+- **Testing (first-class — see Decision 11):** the deterministic core (scaling, unit conversion, shopping aggregation, food-mapping, parsers, receipt itemization) is built **test-first (TDD)** with thorough unit suites and is testable with no network/AI. Typed contracts (tRPC + zod) plus tests at the domain-service boundary. **CI gates on green** before any merge.
 - **Observability:** minimal by default (non-technical users), with opt-in logging for power users.
 
 ## Open architectural questions (resolved during deep brainstorm)
