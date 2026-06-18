@@ -35,3 +35,6 @@ coverage/
 *.sqlite
 *.sqlite3
 pgdata/
+
+# Visual companion (brainstorming)
+.superpowers/

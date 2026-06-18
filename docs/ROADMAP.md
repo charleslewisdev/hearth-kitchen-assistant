@@ -2,7 +2,7 @@
 
 > **Living doc — updated every working session.** Keep this current as the single source of truth for "where are we and what's next." Each phase becomes its own spec → plan → build cycle when we reach it.
 
-_Last updated: 2026-06-17_
+_Last updated: 2026-06-17 (UI/layout design session)_
 
 ## How to read this
 
@@ -67,13 +67,18 @@ Resolved in the 2026-06-17 deep brainstorm (→ [DECISION_LOG.md](DECISION_LOG.m
 9. ✅ License → AGPL-3.0, copyright-retained (D21)
 10. ✅ Borrow-from / UI inspiration → see [INSPIRATION.md](INSPIRATION.md)
 
+Resolved in the 2026-06-17 UI/layout design session (→ [DECISION_LOG.md](DECISION_LOG.md) 24–30, [UI spec](superpowers/specs/2026-06-17-ui-design-p0-p1-design.md)):
+
+11. ✅ UI/layout design for the five key screens + design system + app shell → D24–D30
+
 Still open (next sessions):
 
-- **UI/layout design** for the key screens (recipe view, cook mode, planner calendar, shopping list, import flow) — to be done with the visual companion.
 - Better Auth ↔ Drizzle integration specifics; RLS vs app-layer tenant scoping; PWA offline-sync conflict resolution (deferred to P0/relevant specs).
+- Exact design-token ramps, spacing scale, dark-theme values (settled during implementation).
 
 ## Session log
 
 Append a short entry per working session so context survives across months.
 
-- **2026-06-17** — Ran FOSS landscape research (deep-research, 101 agents). Decided to build Hearth. Locked: TS full-stack, React/Vite PWA + Fastify/tRPC + Postgres, Better Auth + optional OIDC, single-tenant-first/MT-ready. Authored north-star docs. Then ran a deep feature brainstorm → **Decisions 9–23**: structured-core recipe model, canonical Food entity, scaling rules, unit system, deterministic/LLM boundary, portion ledger (leftovers/freezer/freshness), search+filters, shopping-list sorting, tiered sale ads, full receipt→budget loop, opt-in pantry, AGPL-3.0, magic-link sharing, pnpm monorepo skeleton. Wrote [INSPIRATION.md](INSPIRATION.md). **Next: UI/layout design with the visual companion, then write the P0/P1 spec and move to writing-plans.**
+- **2026-06-17** — Ran FOSS landscape research (deep-research, 101 agents). Decided to build Hearth. Locked: TS full-stack, React/Vite PWA + Fastify/tRPC + Postgres, Better Auth + optional OIDC, single-tenant-first/MT-ready. Authored north-star docs. Then ran a deep feature brainstorm → **Decisions 9–23**: structured-core recipe model, canonical Food entity, scaling rules, unit system, deterministic/LLM boundary, portion ledger (leftovers/freezer/freshness), search+filters, shopping-list sorting, tiered sale ads, full receipt→budget loop, opt-in pantry, AGPL-3.0, magic-link sharing, pnpm monorepo skeleton. Wrote [INSPIRATION.md](INSPIRATION.md).
+- **2026-06-17 (cont.)** — UI/layout design session with the visual companion. Designed all five priority screens + the shared design system + responsive app shell → **Decisions 24–30** and the [UI/UX design spec](superpowers/specs/2026-06-17-ui-design-p0-p1-design.md): Fresh Market theme on semantic design tokens (swappable themes + dark mode), bottom-tabs⇄left-rail shell, segmented recipe view + single-scroll Focus cook mode (wake lock, stacking timer tray, ingredient peek), week-agenda planner with source-coded slots + "use what you have" picker, department-grouped sink-away shopping list, source-tile import with confidence-flagged review, library with chips + smart-search tokens. **Next: writing-plans to turn the UI spec (with the P0/P1 backlog) into an implementation plan.**
