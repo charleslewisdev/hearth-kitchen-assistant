@@ -1,0 +1,82 @@
+/* AppShell.module.css — bottom bar on phone, left rail on desktop */
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+.main {
+  flex: 1;
+  padding: 16px;
+}
+.rail {
+  display: flex;
+  order: 2;
+  position: sticky;
+  bottom: 0;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+}
+.brand,
+.add {
+  display: none;
+}
+.item {
+  flex: 1;
+  padding: 10px;
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.item[aria-current='true'] {
+  color: var(--color-accent-soft-text);
+  font-weight: 700;
+}
+
+@media (min-width: 768px) {
+  .shell {
+    flex-direction: row;
+  }
+  .rail {
+    order: 0;
+    flex-direction: column;
+    width: 200px;
+    border-top: none;
+    border-right: 1px solid var(--color-border);
+    padding: 16px 12px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+  }
+  .brand {
+    display: block;
+    font-weight: 900;
+    font-size: 19px;
+    padding: 4px 8px 14px;
+  }
+  .add {
+    display: block;
+    background: var(--color-accent);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 10px;
+    font-weight: 700;
+    margin-bottom: 14px;
+  }
+  .item {
+    flex: none;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 11px;
+    font-size: 14px;
+    border-radius: 9px;
+  }
+  .item[aria-current='true'] {
+    background: var(--color-accent-soft);
+  }
+}
