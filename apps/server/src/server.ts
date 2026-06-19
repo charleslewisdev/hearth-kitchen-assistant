@@ -1,11 +1,40 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import { env } from './env';
+import { auth } from './auth';
 
 export async function buildServer(): Promise<FastifyInstance> {
   const app = Fastify({ logger: false });
   await app.register(cors, { origin: env.WEB_ORIGIN, credentials: true });
   app.get('/health', async () => ({ status: 'ok' }));
+
+  // Convert Fastify's raw req into a web Request and delegate to Better Auth.
+  app.route({
+    method: ['GET', 'POST'],
+    url: '/api/auth/*',
+    async handler(req, reply) {
+      const url = new URL(req.url, env.BETTER_AUTH_URL);
+      const headers = new Headers();
+      for (const [k, v] of Object.entries(req.headers)) {
+        if (typeof v === 'string') headers.set(k, v);
+      }
+      const request = new Request(url, {
+        method: req.method,
+        headers,
+        body: ['GET', 'HEAD'].includes(req.method) ? undefined : JSON.stringify(req.body),
+      });
+      const res = await auth.handler(request);
+      reply.status(res.status);
+      // A Web `Headers` object merges multiple Set-Cookie values into one comma-joined
+      // string, which corrupts the session cookie. Forward them explicitly.
+      for (const cookie of res.headers.getSetCookie()) reply.header('set-cookie', cookie);
+      res.headers.forEach((value, key) => {
+        if (key.toLowerCase() !== 'set-cookie') reply.header(key, value);
+      });
+      reply.send(res.body ? await res.text() : null);
+    },
+  });
+
   return app;
 }
 
