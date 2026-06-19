@@ -38,3 +38,6 @@ pgdata/
 
 # Visual companion (brainstorming)
 .superpowers/
+
+# Local-only docker compose overrides (per-machine port remaps, etc.)
+docker-compose.override.yml
