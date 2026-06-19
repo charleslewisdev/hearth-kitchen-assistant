@@ -1,0 +1,20 @@
+# Single public origin: Caddy serves the SPA and reverse-proxies the API to the
+# server container. Same-origin is what keeps Better Auth's SameSite=Lax session
+# cookie working in the browser (mirrors the Vite dev proxy).
+#
+# Listens on :80 inside the container; compose maps it to a host port. For a real
+# deployment behind a domain, replace `:80` with your hostname and Caddy will
+# provision TLS automatically (the reason Caddy is the proxy of choice here).
+:80 {
+	handle /api/* {
+		reverse_proxy server:3000
+	}
+	handle /trpc/* {
+		reverse_proxy server:3000
+	}
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

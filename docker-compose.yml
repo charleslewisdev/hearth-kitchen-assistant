@@ -14,5 +14,43 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  # API + auth. Runs migrations on boot, then serves Fastify/tRPC on :3000 (internal).
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    environment:
+      DATABASE_URL: postgres://hearth:hearth@db:5432/hearth
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-dev-secret-change-me-min-32-chars-long}
+      # The public origin the browser uses (Caddy). Auth baseURL + trusted origin.
+      BETTER_AUTH_URL: ${PUBLIC_URL:-http://localhost:8080}
+      WEB_ORIGIN: ${PUBLIC_URL:-http://localhost:8080}
+      PORT: 3000
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Single public entrypoint: serves the built SPA and reverse-proxies /api + /trpc
+  # to `server`. This is the one-command `docker compose up` surface (Decision 32).
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - '8080:80'
+    depends_on:
+      server:
+        condition: service_healthy
+
 volumes:
   hearth_pg:
