@@ -6,4 +6,14 @@ import { fileURLToPath } from 'node:url';
 // from the job env, so dotenv is a harmless no-op there.
 config({ path: fileURLToPath(new URL('../../.env', import.meta.url)) });
 
-export default defineConfig({ test: { environment: 'node' } });
+export default defineConfig({
+  test: {
+    environment: 'node',
+    // Server tests share one Postgres database and reset it via TRUNCATE. Running
+    // test files in parallel lets one file's reset wipe another's rows mid-test
+    // (surfaces as FK violations / wrong counts). A single fork runs this project's
+    // files sequentially in one process, isolating DB state per file.
+    pool: 'forks',
+    poolOptions: { forks: { singleFork: true } },
+  },
+});
