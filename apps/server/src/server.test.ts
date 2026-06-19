@@ -34,3 +34,61 @@ describe('auth', () => {
     expect(res.headers['set-cookie']).toBeDefined();
   });
 });
+
+describe('trpc recipe', () => {
+  beforeAll(async () => {
+    await resetDb();
+  });
+
+  it('rejects recipe.list without a session', async () => {
+    const res = await app.inject({ method: 'GET', url: '/trpc/recipe.list' });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('authed user creates then lists a recipe', async () => {
+    // sign up, capture cookie
+    const signup = await app.inject({
+      method: 'POST',
+      url: '/api/auth/sign-up/email',
+      payload: { email: 'b@test.dev', password: 'password1234', name: 'B' },
+      headers: { 'content-type': 'application/json' },
+    });
+    const cookie = signup.headers['set-cookie'] as string;
+
+    // create the household (organization) and make it active
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/auth/organization/create',
+      payload: { name: 'Home', slug: `home-${Date.now()}` },
+      headers: { 'content-type': 'application/json', cookie },
+    });
+    expect(created.statusCode).toBeLessThan(400);
+    const org = created.json() as { id?: string; organization?: { id: string } };
+    const orgId = org.id ?? org.organization?.id;
+    expect(orgId).toBeTruthy();
+    await app.inject({
+      method: 'POST',
+      url: '/api/auth/organization/set-active',
+      payload: { organizationId: orgId },
+      headers: { 'content-type': 'application/json', cookie },
+    });
+
+    // create a recipe via tRPC
+    const create = await app.inject({
+      method: 'POST',
+      url: '/trpc/recipe.create',
+      payload: { title: 'White Bean Soup' },
+      headers: { 'content-type': 'application/json', cookie },
+    });
+    expect(create.statusCode).toBe(200);
+
+    // list it back
+    const list = await app.inject({
+      method: 'GET',
+      url: '/trpc/recipe.list',
+      headers: { cookie },
+    });
+    expect(list.statusCode).toBe(200);
+    expect(JSON.stringify(list.json())).toContain('White Bean Soup');
+  });
+});

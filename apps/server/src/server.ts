@@ -1,7 +1,10 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
+import { fastifyTRPCPlugin } from '@trpc/server/adapters/fastify';
 import { env } from './env';
 import { auth } from './auth';
+import { appRouter } from './trpc/routers';
+import { createContext } from './trpc/context';
 
 export async function buildServer(): Promise<FastifyInstance> {
   const app = Fastify({ logger: false });
@@ -33,6 +36,11 @@ export async function buildServer(): Promise<FastifyInstance> {
       });
       reply.send(res.body ? await res.text() : null);
     },
+  });
+
+  await app.register(fastifyTRPCPlugin, {
+    prefix: '/trpc',
+    trpcOptions: { router: appRouter, createContext },
   });
 
   return app;
