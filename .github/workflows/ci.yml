@@ -1,0 +1,31 @@
+name: CI
+on:
+  push: { branches: [main] }
+  pull_request: { branches: [main] }
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_USER: hearth, POSTGRES_PASSWORD: hearth, POSTGRES_DB: hearth }
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U hearth" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://hearth:hearth@localhost:5432/hearth
+      BETTER_AUTH_SECRET: ci-secret-must-be-at-least-32-characters
+      BETTER_AUTH_URL: http://localhost:3000
+      WEB_ORIGIN: http://localhost:5173
+    steps:
+      - uses: actions/checkout@v4
+      # action-setup reads the pinned version from package.json "packageManager".
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @hearth/server db:migrate
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
