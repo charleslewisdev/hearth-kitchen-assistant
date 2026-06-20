@@ -19,10 +19,10 @@ jobs:
       BETTER_AUTH_URL: http://localhost:3000
       WEB_ORIGIN: http://localhost:5173
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # action-setup reads the pinned version from package.json "packageManager".
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
         with: { node-version: 20, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @hearth/server db:migrate
