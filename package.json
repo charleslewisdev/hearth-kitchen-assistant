@@ -9,6 +9,9 @@
     "typecheck": "pnpm -r typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:local": "pnpm db:up && pnpm db:migrate && vitest run",
+    "db:up": "docker compose up -d --wait db",
+    "db:migrate": "pnpm --filter @hearth/server db:migrate",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write ."
   },
