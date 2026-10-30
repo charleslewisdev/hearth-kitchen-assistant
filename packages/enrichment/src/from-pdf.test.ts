@@ -239,9 +239,9 @@ describe('a PDF built to be expensive rather than to be a recipe', () => {
   it('refuses it for what it is, rather than spending twelve seconds on it', async () => {
     const started = Date.now();
     const result = await draftFromPdf(fixture('pinned-text-items.pdf'));
-    // Generous by two orders of magnitude against the 12,952ms this used to take, and loose
-    // enough not to care what else the machine is doing.
-    expect(Date.now() - started).toBeLessThan(3000);
+    // Half of the 12,952ms this used to take, so the old behaviour still fails here, and loose
+    // enough not to care what else the machine is doing: 3,000ms failed under load at 3,052ms.
+    expect(Date.now() - started).toBeLessThan(6000);
     expect(result).toEqual({ ok: false, reason: 'too-much-content' });
   }, 30_000);
 

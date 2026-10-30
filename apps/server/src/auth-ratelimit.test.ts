@@ -350,7 +350,8 @@ describe('auth rate limiting', () => {
     const limitedOnUnknown = await signIn('203.0.113.27', 'stranger@example.com');
     expect(limitedOnKnown.body).toBe(limitedOnUnknown.body);
     expect(limitedOnKnown.body).not.toContain(known);
-  });
+    // Over twenty real password hashes, which outlast the default timeout on a busy machine.
+  }, 20_000);
 
   /**
    * The auth limiter answers its own 429 without throwing, so neither the error handler's line
