@@ -17,3 +17,4 @@ scratch-*
 .private
 # Test data the image never reads.
 packages/enrichment/test
+docs/screenshots

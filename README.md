@@ -13,6 +13,22 @@ signal. Accounts are invite-only: the owner claims a fresh instance with a first
 invites family by email. Pantry, spend tracking and full data export are still to come; the
 [Roadmap](docs/ROADMAP.md) has the detail.
 
+## Screenshots
+
+Every recipe here is invented. `pnpm screenshots` rebuilds them from the running app.
+
+| Recipes | Planning a week |
+| --- | --- |
+| ![The recipe library](docs/screenshots/library.png) | ![A week of planned dinners](docs/screenshots/plan.png) |
+
+| A recipe | Importing from pasted text |
+| --- | --- |
+| ![A recipe with its ingredients](docs/screenshots/recipe.png) | ![Reviewing an imported recipe](docs/screenshots/import-review.png) |
+
+| Shopping, by department | Cook mode |
+| --- | --- |
+| <img src="docs/screenshots/shopping-phone.png" alt="The shopping list on a phone" width="300"> | <img src="docs/screenshots/cook-phone.png" alt="Cook mode on a phone" width="300"> |
+
 ## Quick start
 
 You need Docker with Compose.

@@ -14,6 +14,8 @@
     "test:watch": "vitest",
     "test:local": "pnpm db:up && pnpm db:migrate && vitest run",
     "test:e2e": "playwright test -c e2e/playwright.config.ts",
+    "screenshots": "bash e2e/screenshots/run.sh",
+    "demo": "bash e2e/screenshots/demo.sh",
     "db:up": "docker compose up -d --wait db",
     "db:migrate": "pnpm --filter @hearth/server db:migrate",
     "lint": "eslint . --ext .ts,.tsx",

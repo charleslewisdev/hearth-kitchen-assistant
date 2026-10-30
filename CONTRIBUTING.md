@@ -31,6 +31,9 @@ pnpm test:local
 `pnpm test:local` truncates the database `DATABASE_URL` points at, so don't aim it at data you want
 to keep. Run `pnpm test:e2e` too if you touch auth, invitations or the shopping flow.
 
+`pnpm screenshots` regenerates the README images from an invented kitchen in its own database, and
+`pnpm demo` opens that kitchen in a browser. Run the first after a visible UI change.
+
 ## Rules that are easy to miss
 
 - Every domain table carries `household_id` and is reached through `withHousehold()`.

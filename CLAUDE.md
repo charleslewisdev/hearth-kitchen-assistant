@@ -8,6 +8,7 @@ A self-hosted, invite-only household app for recipes, shopping lists and (later)
 - Test: `pnpm test:local` (starts the DB, migrates, runs all ~1,100 tests in a few minutes). Plain `pnpm test` fails without Postgres at `DATABASE_URL`.
 - One test: `pnpm vitest run apps/server/src/repo/foods.test.ts`; shared: `pnpm --filter @hearth/shared exec vitest run src/slug.test.ts`
 - E2E: `pnpm test:e2e` (needs the DB up and migrated, `.env`, and Chromium; it starts both dev servers itself). CI does not run it, so run it after touching auth, invites or the shopping flow.
+- Screenshots: `pnpm screenshots` rebuilds the invented demo kitchen (`hearth_demo`, data in `e2e/screenshots/demo-data.ts`) and rewrites `docs/screenshots/`. Stop dev servers first: it refuses a busy :3000 or :5173. `pnpm demo` opens that kitchen to click around in. Read the PNGs after a run; a pass only means the pages loaded.
 - DB: `pnpm db:up`, `pnpm db:migrate`. Local Postgres is on 5433 via the gitignored `docker-compose.override.yml`; the committed compose and `.env.example` say 5432.
 
 ## Conventions that differ from defaults
