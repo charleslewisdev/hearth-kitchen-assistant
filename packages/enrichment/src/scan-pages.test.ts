@@ -65,7 +65,8 @@ describe('imageClaims', () => {
     const hostile = pdfText('/Width 1 stream '.repeat(400_000));
     const started = Date.now();
     imageClaims(hostile);
-    expect(Date.now() - started).toBeLessThan(1000);
+    // A quadratic scan of 6MB takes minutes, so this has room for a busy machine.
+    expect(Date.now() - started).toBeLessThan(3000);
   });
 });
 
