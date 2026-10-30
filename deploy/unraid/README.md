@@ -17,18 +17,7 @@ Templates: `hearth-db.xml` and `hearth.xml` in this directory. Image:
 
 ## Before you start
 
-**Registry access.** Package visibility on GHCR is set separately from the repository's, and this
-image is private. If you are not the owner, build your own image from the root `Dockerfile`. As the
-owner, log the box in once with a GitHub token that has `read:packages` only:
-
-```
-docker login ghcr.io -u charleslewisdev
-```
-
-unraid rebuilds `/root` at boot, but on current releases `/root/.docker` is a link onto the flash
-drive (`/boot/config/plugins/dockerMan`), so the login survives a reboot. Check with
-`ls -l /root/.docker` if unsure; if it is a plain directory, re-run the login from your `go` file
-or a User Script at array start.
+**Registry access.** The image is public, so pulling it needs no login or token.
 
 **The network.** Create it once. Settings → Docker → "Preserve user defined networks" must be on,
 or unraid drops it when the Docker service restarts.
