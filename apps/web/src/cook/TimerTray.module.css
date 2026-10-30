@@ -1,0 +1,152 @@
+/*
+  TimerTray.module.css - D26's sticky stacking timer tray.
+
+  Dark in BOTH themes: it is a layer over the recipe rather than part of it, and the contrast
+  between a dark tray and a light kitchen screen is what makes a running timer findable at a
+  glance from across the counter. The tokens it uses are declared once in tokens.css for that
+  reason.
+
+  The tray is not positioned here. CookMode renders it inside `.dock`, the one fixed layer at
+  the bottom of that screen, so that the ingredient peek stacks above the tray instead of over
+  it.
+*/
+.tray {
+  background: var(--color-tray-bg);
+  border-top: 1px solid var(--color-tray-surface);
+  padding: 8px 10px;
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+  box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.28);
+}
+
+/* Stacked, and scrollable once there are more timers than fit. Three rows is already an
+   unusual number of pans, and the 200px cap is what CookMode reserves room for below the last
+   step. */
+.list {
+  list-style: none;
+  margin: 0 auto;
+  padding: 0;
+  max-width: 720px;
+  max-height: 200px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--color-tray-surface);
+  color: var(--color-tray-text);
+}
+
+/* A fired timer: amber fill, not merely a colour shift on the same card, plus the word "Done"
+   where the countdown was. */
+.rowFired {
+  composes: row;
+  background: var(--color-alarm-bg);
+  color: var(--color-alarm-text);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.72;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rowFired {
+    animation: none;
+  }
+}
+
+.ring {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  transform: rotate(-90deg);
+}
+
+.ringTrack {
+  fill: none;
+  stroke: var(--color-tray-bg);
+  stroke-width: 5;
+}
+
+.rowFired .ringTrack {
+  stroke: var(--color-alarm-text);
+  opacity: 0.25;
+}
+
+.ringProgress {
+  fill: none;
+  stroke: var(--color-accent);
+  stroke-width: 5;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.5s linear;
+}
+
+.rowFired .ringProgress {
+  stroke: var(--color-alarm-text);
+}
+
+.readout {
+  flex: 1;
+  min-width: 0;
+}
+
+.time {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.label {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--color-tray-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowFired .label {
+  color: var(--color-alarm-text);
+}
+
+.stop {
+  flex: none;
+  min-width: 64px;
+  min-height: 48px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 2px solid currentColor;
+  background: transparent;
+  color: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.stop:focus-visible {
+  outline: 3px solid var(--color-tray-text);
+  outline-offset: 2px;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

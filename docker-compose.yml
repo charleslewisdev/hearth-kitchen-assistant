@@ -1,0 +1,101 @@
+# Docker's default logging driver is `json-file` with NO rotation, so a log file grows until
+# the disk is full and the box stops. That is not a theoretical bound here: Phase E measured
+# ~815 bytes of log per request under a flood sustained at ~4,500 req/s, and Fastify writes its
+# `incoming request` line from an `onRequest` hook that runs before any of ours, so the rate
+# limiter cannot reduce it - a refused request still costs two lines plus the limiter's own.
+#
+# 20 MB x 5 files caps each container at 100 MB, ~350 MB for the stack. Read the second number
+# honestly: at the measured flood rate 100 MB is about half a minute of traffic, so this bounds
+# DISK USE, not retention. Under an active flood the useful lines roll off fast, which is the
+# argument for shipping logs off the box rather than for a bigger ring here.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: '20m'
+    max-file: '5'
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: hearth
+      POSTGRES_PASSWORD: hearth
+      POSTGRES_DB: hearth
+    # Published because `pnpm test:local`, `pnpm dev` and drizzle-kit all connect from the host,
+    # and on loopback only, because the password above is in this public file.
+    # The deployment does NOT do this: the unraid template publishes no port at all (D37), so
+    # the database is reachable only over the `hearth` docker network.
+    ports:
+      - '127.0.0.1:5432:5432'
+    volumes:
+      - hearth_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U hearth']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    logging: *logging
+
+  # The app: API, auth and the web app itself (D46). Runs migrations on boot, then serves on
+  # :3000. This is the one-command `docker compose up` surface (Decision 32).
+  hearth:
+    build:
+      context: .
+    environment:
+      DATABASE_URL: postgres://hearth:hearth@db:5432/hearth
+      # This stack is reachable from outside the machine, so it is production, and saying so is
+      # what arms the guards: the server REFUSES to start on the published dev secret, and logs
+      # come out as JSON rather than pretty-printed.
+      NODE_ENV: production
+      # Empty means "generate one into DATA_DIR on first boot" - the empty string is read as
+      # absent (see env.ts). It used to default to the dev secret published in this repository,
+      # which combined with the absent NODE_ENV above meant every `docker compose up` signed
+      # session cookies with a key anyone can read off GitHub, warning about it and carrying on.
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-}
+      # The generated secret lives here, on a named volume. Without the volume it dies with the
+      # container and every household member is logged out on the next `docker compose up`.
+      DATA_DIR: /data
+      # The public origin the browser uses. Auth baseURL + trusted origin. It is the
+      # only origin-shaped value a deployment sets: BETTER_AUTH_URL is gone and WEB_ORIGIN
+      # survives only as this one's fallback (see .env.example).
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:8080}
+      # Who may vouch for the client's address: a hop count, or the proxy's own address (see
+      # env.ts). Nothing fronts this file's loopback port, so the default is 0. Put a proxy in
+      # front and set it to that proxy, or every client shares one rate-limit bucket.
+      TRUST_PROXY: ${TRUST_PROXY:-0}
+      PORT: 3000
+      # SMTP, passed through from the host environment (or the repo `.env`). Written as bare
+      # keys, which compose resolves from the environment and OMITS when unset - unlike
+      # `${VAR:-}`, which sets the variable to the empty string. env.ts reads blank as absent
+      # either way, so both work; omitting is preferred because it keeps the trap one layer
+      # away rather than relying on that rule.
+      #
+      # Without these the container sees no SMTP settings at all, whatever `.env` documents,
+      # and the mailer silently stays in console mode - writing invitation links into the log
+      # instead of sending them. That was the state until this task.
+      SMTP_HOST:
+      SMTP_PORT:
+      SMTP_SECURE:
+      SMTP_USER:
+      SMTP_PASS:
+      SMTP_FROM:
+      # `silent` is the one level that breaks a zero-config install: with no SMTP configured
+      # the log line IS how an invitation or a verification link is delivered.
+      LOG_LEVEL:
+    # Loopback, so only this machine reaches it until you choose to put a proxy in front.
+    ports:
+      - '127.0.0.1:8080:3000'
+    volumes:
+      - hearth_data:/data
+    depends_on:
+      db:
+        condition: service_healthy
+    # No `healthcheck:` here on purpose. The one this used to carry is now a HEALTHCHECK in
+    # the Dockerfile, which compose inherits and `depends_on: service_healthy` below
+    # reads - and which the unraid deployment gets too, where there is no compose file to
+    # define one. Two copies of the same check is how one of them ends up wrong.
+    logging: *logging
+
+volumes:
+  hearth_pg:
+  hearth_data:

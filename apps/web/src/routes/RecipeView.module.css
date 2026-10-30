@@ -1,0 +1,579 @@
+/* RecipeView.module.css — the recipe screen (D49): header band, ingredient card, action bar. */
+.view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 760px;
+}
+
+.status {
+  color: var(--color-text-muted);
+}
+
+.error {
+  color: var(--color-leftover-text);
+  background: var(--color-leftover-bg);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin: 0;
+}
+
+/* Header band: bleeds to the screen edges on a phone, a rounded panel on desktop. */
+.band {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--color-surface-2);
+  margin: -16px -16px 0;
+  padding: 12px 20px 22px;
+  border-radius: 0 0 28px 28px;
+}
+
+@media (min-width: 768px) {
+  .band {
+    margin: 0;
+    border-radius: var(--radius-card);
+  }
+}
+
+.bandBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.roundButton,
+.pillButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-radius: var(--radius-pill);
+  text-decoration: none;
+  font-weight: 700;
+}
+
+/* The cover photo, across the band under its buttons. */
+.cover {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  max-height: 360px;
+  object-fit: cover;
+  border-radius: 18px;
+  background: var(--color-border);
+}
+
+.roundButton {
+  width: 44px;
+}
+
+.pillButton {
+  padding: 0 18px;
+}
+
+.barIcon {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pills {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pill,
+.typePill {
+  border-radius: var(--radius-pill);
+  padding: 4px 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* A type: the surface with the library's type colours (meal green, building block amber). */
+.typePill {
+  background: var(--color-surface);
+  color: var(--color-accent-soft-text);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 12px;
+}
+
+.typePill[data-block] {
+  color: var(--color-tag-ink);
+}
+
+/* A tag: its own colour, as on the library card. */
+.pill {
+  background: var(--chip-bg);
+  color: var(--chip-ink);
+}
+
+.rating {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin: -6px 0 -4px -8px;
+}
+
+.trend {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(34px, 10vw, 44px);
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+.stat,
+.servings {
+  background: var(--color-surface);
+  border-radius: 14px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.servings {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 4px;
+  grid-column: span 2;
+}
+
+.servingsText {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.statLabel {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.statValue {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.stepperButton {
+  width: 44px;
+  height: 44px;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  border-radius: var(--radius-pill);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.stepperButton:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Notes and provenance, under the band. */
+.about {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.description {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.source {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  font-size: 14px;
+  color: var(--color-text-muted);
+}
+
+.sourceLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sourceLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  color: var(--color-accent);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+
+.sourceIcon {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Segmented control */
+.segmented {
+  display: flex;
+  gap: 4px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 4px;
+}
+
+.seg,
+.segActive {
+  flex: 1;
+  border: none;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  background: transparent;
+  color: var(--color-text-muted);
+}
+
+.segActive {
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+/* US / Metric: which measure to read, when the recipe prints both. Smaller than the tabs. */
+.measureSwitch {
+  display: inline-flex;
+  gap: 2px;
+  margin: 12px 0 0;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 3px;
+}
+
+.measure,
+.measureActive {
+  border: none;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  background: transparent;
+  color: var(--color-text-muted);
+}
+
+.measureActive {
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+/* Ingredients: one card, rows divided by hairlines, a department dot on each. */
+.ingredients {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+.ingredient,
+.linkedIngredient {
+  display: grid;
+  grid-template-columns: 10px 84px minmax(0, 1fr);
+  align-items: start;
+  column-gap: 10px;
+  padding: 13px 14px;
+  border-top: 1px solid var(--color-border);
+  font-size: 17px;
+}
+
+.ingredient:first-child,
+.linkedIngredient:first-child {
+  border-top: none;
+}
+
+/* A line made from another recipe sits on a soft band, with the way to that recipe under it. */
+.linkedIngredient {
+  background: var(--color-accent-soft);
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--dept-ink);
+  align-self: start;
+  margin-top: 0.5em;
+}
+
+.amount {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.what {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.food {
+  display: inline;
+}
+
+.note {
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.linkedTo {
+  color: var(--color-accent-soft-text);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+/* Steps pane */
+.steps {
+  margin: 0;
+  padding: 4px 0 0 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.step {
+  line-height: 1.55;
+  font-size: 17px;
+  padding-left: 6px;
+}
+
+.step::marker {
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--color-accent);
+}
+
+.confirmation {
+  margin: 0;
+  color: var(--color-accent-soft-text);
+  background: var(--color-accent-soft);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+
+/* The action bar (D26): sticky above the tab bar, never over it. */
+.stickyBar {
+  position: sticky;
+  bottom: calc(var(--nav-height, 0px) + 8px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 10px 0;
+  background: linear-gradient(to top, var(--color-bg) 70%, transparent);
+}
+
+.barButtons {
+  display: flex;
+  gap: 10px;
+}
+
+.barSecondary,
+.cookButton {
+  min-height: 56px;
+  border-radius: var(--radius-pill);
+  padding: 0 20px;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.barSecondary {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1.5px solid var(--color-border);
+  cursor: pointer;
+}
+
+.barSecondary:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* PlanThisRecipe's buttons: accent-outlined, so its submit reads as the form's primary action. */
+.addButton {
+  flex: 1;
+  min-height: 48px;
+  background: var(--color-surface);
+  color: var(--color-accent);
+  border: 1.5px solid var(--color-accent);
+  border-radius: var(--radius-pill);
+  padding: 0 22px;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.addButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.cookButton {
+  flex: 1;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border: none;
+  font-size: 17px;
+}
+
+.dangerZone {
+  display: flex;
+  justify-content: flex-start;
+  border-top: 1px solid var(--color-border);
+  padding-top: 16px;
+}
+
+.confirmDelete {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.confirmDelete p {
+  margin: 0;
+}
+
+.confirmActions {
+  display: flex;
+  gap: 8px;
+}
+
+.secondaryButton {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 10px 16px;
+  min-height: 44px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.deleteButton {
+  background: var(--color-leftover-bg);
+  color: var(--color-leftover-text);
+  border: 1px solid var(--color-leftover-text);
+  border-radius: 999px;
+  padding: 10px 16px;
+  min-height: 44px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.deleteButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.planThis {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.planForm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+
+.planForm label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-weight: 600;
+}
+
+.planForm select {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 16px;
+}
+
+.usedIn {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.usedIn a {
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+/* Share, Print and Edit, together on the right of the band's bar. */
+.bandActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}

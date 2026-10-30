@@ -1,0 +1,196 @@
+.layout {
+  display: grid;
+  gap: 1.5rem;
+  /* One column on a phone; the source panel moves alongside once there is room for it (D29). */
+  grid-template-columns: 1fr;
+}
+@media (min-width: 62rem) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr) 18rem;
+    align-items: start;
+  }
+}
+.form {
+  min-width: 0;
+}
+.heading {
+  margin: 0 0 0.25rem;
+  font-size: 1.5rem;
+}
+.lede {
+  margin: 0 0 1.25rem;
+  color: var(--color-text-muted);
+}
+.field {
+  display: block;
+  margin-bottom: 0.75rem;
+  border: none;
+  padding: 0;
+}
+.label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  margin-bottom: 0.3rem;
+  padding: 0;
+}
+.input,
+.inputFlagged,
+.textarea,
+.textareaFlagged {
+  width: 100%;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+}
+.textarea,
+.textareaFlagged {
+  resize: vertical;
+  line-height: 1.5;
+}
+/*
+  The flag is a border AND a sentence underneath, never colour on its own: a cook reading this
+  in a bright kitchen, or one who does not separate these hues, still gets told which fields
+  were guessed.
+*/
+.inputFlagged,
+.textareaFlagged {
+  border-color: var(--color-flag-border);
+  background: var(--color-flag-bg);
+  color: var(--color-flag-text);
+}
+.flag {
+  margin: -0.4rem 0 0.9rem;
+  font-size: 0.85rem;
+  color: var(--color-flag-text);
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  text-transform: capitalize;
+  font-size: 0.9rem;
+}
+.preview {
+  list-style: none;
+  margin: -0.25rem 0 1rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius);
+  background: var(--color-surface-2);
+  font-size: 0.85rem;
+}
+.previewItem {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.1rem 0;
+}
+.previewItemCheck {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.1rem 0.35rem;
+  margin: 0 -0.35rem;
+  border-radius: var(--radius);
+  background: var(--color-flag-bg);
+}
+.previewCheck {
+  color: var(--color-flag-text);
+  font-style: italic;
+}
+.previewMain {
+  color: var(--color-text);
+}
+.previewNote {
+  color: var(--color-text-muted);
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+.primary,
+.secondary {
+  padding: 0.6rem 1.1rem;
+  border-radius: var(--radius);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.primary {
+  border: none;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+.primary:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.secondary {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+.error {
+  margin: 0.75rem 0 0;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-flag-border);
+  background: var(--color-flag-bg);
+  color: var(--color-flag-text);
+  font-size: 0.9rem;
+}
+.source {
+  padding: 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+.sourceHeading {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+}
+.sourceLink {
+  display: block;
+  margin-bottom: 0.75rem;
+  color: var(--color-accent-soft-text);
+  font-size: 0.8rem;
+  /* A recipe permalink with tracking parameters is long, and must not widen the layout. */
+  overflow-wrap: anywhere;
+}
+.sourceList {
+  margin: 0;
+  font-size: 0.85rem;
+}
+.sourceRow {
+  margin-bottom: 0.5rem;
+}
+.sourceTerm {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.sourceValue {
+  margin: 0.1rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+/* Prep and cook minutes side by side. */
+.timeRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}

@@ -1,0 +1,19 @@
+node_modules
+**/node_modules
+**/dist
+.git
+.github
+.env
+*.log
+docker-compose.override.yml
+# Local state that must never reach an image: the dev server's secret, setup token and the
+# test kitchen's credentials live under .data, and worktrees carry their own .env copies.
+**/.data
+.claude
+e2e/server.log
+test-results
+playwright-report
+scratch-*
+.private
+# Test data the image never reads.
+packages/enrichment/test

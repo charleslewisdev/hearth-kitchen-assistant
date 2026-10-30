@@ -1,0 +1,91 @@
+<!doctype html>
+<!--
+  HAND-AUTHORED, like microdata-oat-cookies.html and for the same reason.
+
+  This is the shape a recipe post has when it carries NO structured data at all: no JSON-LD, no
+  microdata, just a heading, a list and a numbered method. Every reachable site checked on
+  2026-09-10 while collecting the other fixtures emitted JSON-LD, so there was no page to save
+  that exercises the third rung - and the third rung is exactly what a self-hosted blog from
+  before the rich-card era gives you.
+
+  It carries the furniture a real page has around the recipe, because that furniture is what the
+  heuristics have to get past: a nav, a site header, a sidebar of other posts (with its own
+  amounts in it), a comment form and a footer. The recipe itself is inside <article>.
+
+  Covers: article-scoped extraction, an ingredient <ul> with amounts, a numbered <ol> method,
+  a "Serves 6" line, and a sidebar whose amounts must not reach the draft.
+-->
+<html lang="en">
+  <head>
+    <title>Leek and potato soup | Nine Acres</title>
+  </head>
+  <body>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/recipes">Recipes</a>
+      <a href="/about">About</a>
+    </nav>
+    <header>
+      <p>Nine Acres</p>
+      <p>Cooking from a small kitchen since 2009</p>
+    </header>
+
+    <article>
+      <h1>Leek and potato soup</h1>
+      <p>Serves 6</p>
+      <p>
+        The soup I make when there is nothing in the house, which is to say the soup I make most
+        weeks. It wants more pepper than you think.
+      </p>
+
+      <h2>Ingredients</h2>
+      <ul>
+        <li>3 leeks, white and pale green parts only</li>
+        <li>2 Tbsp butter</li>
+        <li>500 g floury potatoes, peeled and cubed</li>
+        <li>1 l chicken stock</li>
+        <li>150 ml double cream</li>
+        <li>Salt and plenty of black pepper</li>
+      </ul>
+
+      <h2>Method</h2>
+      <ol>
+        <li>
+          Split the leeks lengthways, wash the grit out of them properly, and slice them into half
+          moons.
+        </li>
+        <li>
+          Melt the butter in a heavy pan and sweat the leeks in it over a low heat for ten minutes,
+          until they collapse but take no colour.
+        </li>
+        <li>Add the potatoes and the stock, bring it up, and simmer for twenty minutes.</li>
+        <li>
+          Blend it smooth, stir the cream through, and season it hard. Serve it hot in winter and
+          cold in August.
+        </li>
+      </ol>
+
+      <h2>Notes</h2>
+      <p>It freezes without the cream in it. Add that on the day.</p>
+    </article>
+
+    <aside>
+      <h2>More from the blog</h2>
+      <ul>
+        <li>2 cups of oats, four ways</li>
+        <li>1 kg of tomatoes and what to do with them</li>
+        <li>3 Tbsp of harissa in everything</li>
+      </ul>
+    </aside>
+
+    <form>
+      <label for="comment">Leave a comment</label>
+      <textarea id="comment"></textarea>
+      <button type="submit">Post</button>
+    </form>
+
+    <footer>
+      <p>Nine Acres, 2009 to now.</p>
+    </footer>
+  </body>
+</html>

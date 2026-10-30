@@ -1,0 +1,651 @@
+/* Library.module.css — recipe browse grid, search + filter chips, multi-add action bar. */
+.library {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.title {
+  margin: 0;
+  font-size: 34px;
+  line-height: 1.1;
+}
+
+.newButton {
+  display: inline-block;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: 12px 18px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.status {
+  color: var(--color-text-muted);
+}
+
+.error {
+  color: var(--color-leftover-text);
+  background: var(--color-leftover-bg);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin: 0;
+}
+
+/* Cards: one a row on a phone, where there is room for the tags to read; two from 480px, and
+   as many 260px cards as fit on a desktop. */
+.grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+@media (min-width: 480px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 900px) {
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  }
+}
+
+.card {
+  position: relative;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+.cardLink {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 148px;
+  padding: 16px 16px 14px;
+  color: inherit;
+  text-decoration: none;
+  height: 100%;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.2;
+  /* Clear of the tick in the corner. */
+  padding-right: 32px;
+  /* Long titles ("Pasta Salsiccia e Porri (Pasta with Leeks and Sausage)") stop at three lines. */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* The cover, under the title as the card's layout has it (title, photo, types, tags, footer). */
+.cardPhoto {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 12px;
+  background: var(--color-surface-2);
+}
+
+/* The recipe's types: small caps with a dot, meals green and building blocks amber, so they
+   read as a different kind of thing from the filled tag chips below. */
+.types {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.typeMeal,
+.typeBlock {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.typeMeal {
+  color: var(--color-accent-soft-text);
+}
+
+.typeBlock {
+  color: var(--color-tag-ink);
+}
+
+.typeMeal::before,
+.typeBlock::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.cardTags {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tagChip,
+.tagMore {
+  border-radius: var(--radius-pill);
+  padding: 3px 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.tagChip {
+  background: var(--chip-bg);
+  color: var(--chip-ink);
+}
+
+.tagMore {
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+}
+
+/* Servings left, total time right, on a hairline at the bottom of the card. */
+.foot {
+  margin: auto 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.footRating {
+  color: var(--color-tag-ink);
+  font-weight: 700;
+}
+
+.cooked {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+}
+
+.footItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.footIcon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* List view: one line of title per recipe with its types and tags beneath, and the numbers at
+   the right. The tick sits at the left, where a list's eye starts. */
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+.row {
+  position: relative;
+}
+
+.row + .row {
+  border-top: 1px solid var(--color-border);
+}
+
+.row .cardLink {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'photo title foot'
+    'photo types foot'
+    'photo tags foot';
+  align-items: center;
+  /* No column gap: a row without a photo keeps its title where the others' are; the photo
+     carries its own margin. */
+  gap: 4px 0;
+  min-height: 0;
+  padding: 12px 14px 12px 52px;
+}
+
+.row .cardTitle {
+  grid-area: title;
+  padding-right: 0;
+  font-size: 17px;
+  -webkit-line-clamp: 2;
+}
+
+.row .cardPhoto {
+  grid-area: photo;
+  margin-right: 12px;
+  width: 56px;
+  height: 56px;
+  aspect-ratio: auto;
+  border-radius: 10px;
+}
+
+.row .types {
+  grid-area: types;
+  font-size: 11px;
+}
+
+.row .cardTags {
+  grid-area: tags;
+}
+
+.row .cooked {
+  display: none;
+}
+
+.row .tagChip,
+.row .tagMore {
+  font-size: 11.5px;
+  padding: 1px 8px;
+}
+
+.row .foot {
+  grid-area: foot;
+  margin: 0 0 0 12px;
+  padding: 0;
+  border: none;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  font-size: 12.5px;
+}
+
+.row .select {
+  top: 50%;
+  left: 14px;
+  right: auto;
+  transform: translateY(-50%);
+}
+
+.row:has(.select:checked) {
+  background: var(--color-accent-soft);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.count {
+  margin: 0 auto 0 0;
+  font-size: 14px;
+  color: var(--color-text-muted);
+}
+
+.sortLabel {
+  display: flex;
+}
+
+.sortSelect {
+  min-height: 40px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  padding: 6px 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.viewToggle {
+  display: flex;
+  gap: 2px;
+  background: var(--color-surface-2);
+  border-radius: var(--radius-pill);
+  padding: 3px;
+}
+
+.viewButton,
+.viewOn {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 36px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.viewOn {
+  background: var(--color-surface);
+  color: var(--color-accent);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+.viewIcon {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+/* A round tick in the card's corner: picks the recipe for the multi-add bar below. */
+.select {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+  width: 26px;
+  height: 26px;
+  margin: 0;
+  appearance: none;
+  /* Muted ink, not the hairline: a control's outline needs 3:1, and the hairline all but
+     vanished on a dark card. */
+  border: 1.5px solid var(--color-text-muted);
+  border-radius: 50%;
+  background: var(--color-surface);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.select::after {
+  content: '';
+  width: 10px;
+  height: 6px;
+  border-left: 2px solid var(--color-on-accent);
+  border-bottom: 2px solid var(--color-on-accent);
+  transform: rotate(-45deg) translate(1px, -1px);
+  opacity: 0;
+}
+
+.select:checked {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.select:checked::after {
+  opacity: 1;
+}
+
+.select:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.card:has(.select:checked) {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent);
+}
+
+.confirmation {
+  margin: 0;
+  color: var(--color-accent-soft-text);
+  background: var(--color-accent-soft);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+
+/* Sticky action bar so the multi-add stays reachable while scrolling. */
+.actionBar {
+  position: sticky;
+  bottom: calc(var(--nav-height, 0px) + 12px);
+  display: flex;
+  justify-content: center;
+}
+
+.addButton {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border: none;
+  border-radius: var(--radius-pill);
+  min-height: 52px;
+  padding: 0 24px;
+  font-weight: 700;
+  font-size: 16px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+}
+
+.addButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  padding: 48px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+}
+
+.emptyTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.emptyBody {
+  margin: 0 0 8px;
+  color: var(--color-text-muted);
+}
+
+/* Visually hidden but present for assistive tech and for `getByLabelText`. The clip-rect
+   idiom rather than `display: none`, which would remove it from the accessibility tree and
+   leave the search box unlabelled. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.searchRow {
+  display: flex;
+  gap: 8px;
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  min-height: 48px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  padding: 10px 18px;
+  font-family: inherit;
+  font-size: 16px; /* iOS zooms the page on focus below 16px. */
+}
+
+.filtersButton {
+  min-height: 48px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  padding: 10px 18px;
+  font-family: inherit;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/* One row of chips, scrolled sideways rather than wrapped: the grid below is what should be
+   growing down the screen. */
+.chipRow {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.filterChip {
+  flex: none;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  min-height: 40px;
+  padding: 8px 14px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: capitalize;
+  cursor: pointer;
+}
+
+.chipOn {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-soft-text);
+  border-color: var(--color-accent);
+}
+
+.chipCount {
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+.suggestions,
+.tokens {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.suggestion {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px dashed var(--color-border);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.token {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-soft-text);
+  border: 1px solid var(--color-accent);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 16px;
+}
+
+.sheetGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sheetLabel {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}
+
+.sheetActions {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.clearButton {
+  background: none;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  padding: 10px 16px;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.doneButton {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: 10px 20px;
+  font-family: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}

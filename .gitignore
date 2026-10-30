@@ -1,0 +1,62 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Build output
+dist/
+build/
+.next/
+out/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+
+# Test / coverage
+coverage/
+.nyc_output/
+
+# Playwright (E2E) artifacts
+test-results/
+playwright-report/
+.playwright/
+blob-report/
+playwright/.cache/
+
+# Local data
+*.sqlite
+*.sqlite3
+pgdata/
+# DATA_DIR: holds the auth secret generated on first boot. Committing it would publish the key
+# every session cookie is signed with.
+.data/
+
+# Git worktrees (isolated feature workspaces)
+.worktrees/
+
+# Visual companion (brainstorming)
+.superpowers/
+
+# Local-only docker compose overrides (per-machine port remaps, etc.)
+docker-compose.override.yml
+
+# Throwaway probes. A stray file under a package's `src` is not inert: `*.test.ts` is picked up
+# by `pnpm test`, and anything at all is picked up by `pnpm lint` and `tsc`, so one left behind
+# breaks the suite. Naming them `scratch-*` at least keeps them from being committed.
+scratch-*
+.claude/worktrees/

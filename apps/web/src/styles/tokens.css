@@ -1,0 +1,159 @@
+/*
+  D49's "Market + Cookbook" token set (docs/specs/2026-09-24-hearth-hybrid-design.md). Components
+  use these roles, never hex (D24). The role names predate D49 and are kept, so a screen not yet
+  restyled still picks up the new palette.
+*/
+:root {
+  --color-bg: #f6f1e7;
+  --color-surface: #fffdf8;
+  --color-surface-2: #efe7d8;
+  --color-border: #e4dacb;
+  --color-text: #231f1a;
+  --color-text-muted: #6b6257;
+  --color-accent: #2a7454;
+  --color-on-accent: #ffffff;
+  --color-accent-soft: #e3efe6;
+  --color-accent-soft-text: #1f5a40;
+  /* Tag and meal pills on the recipe screen's header band. */
+  --color-tag-ink: #8a5a1c;
+  --color-leftover-bg: #f7e6c8;
+  --color-leftover-text: #85520b;
+  --color-frozen-bg: #e1ecf6;
+  --color-frozen-text: #2a5f94;
+
+  /*
+    The amber an imported field wears when the source did not actually say it (D29).
+    Its own tokens rather than the leftover badge's, which happen to be the same family: one
+    means "this is older food", the other means "look at this before you save it", and a
+    later change to either should not silently move the other.
+  */
+  --color-flag-bg: #f7e6c8;
+  --color-flag-text: #7d4f08;
+  --color-flag-border: #ddb46c;
+
+  /*
+    One tint (section header) and one ink (label, dot) per store department. Every ink is at
+    least 5:1 on its tint, and the department's name is always written beside the colour.
+  */
+  --dept-produce-bg: #e4f1e6;
+  --dept-produce-ink: #2d6a3e;
+  --dept-bakery-bg: #f5e9d6;
+  --dept-bakery-ink: #7a5418;
+  --dept-meat-bg: #f8e3e1;
+  --dept-meat-ink: #9b3a30;
+  --dept-dairy-bg: #e6eef8;
+  --dept-dairy-ink: #2a5486;
+  --dept-frozen-bg: #e1f0f3;
+  --dept-frozen-ink: #1f6570;
+  --dept-pantry-bg: #f7ecdd;
+  --dept-pantry-ink: #8a5a1c;
+  --dept-baking-bg: #f3e6ec;
+  --dept-baking-ink: #8a3d5e;
+  --dept-beverages-bg: #ece8f6;
+  --dept-beverages-ink: #50428e;
+  --dept-other-bg: var(--color-surface-2);
+  --dept-other-ink: var(--color-text-muted);
+
+  /*
+    Tag chips (TAG_COLORS in @hearth/shared). The department pairs already meet 5:1 in both
+    themes, so the tag palette borrows them rather than inventing eight more; `amber` and
+    `wheat` take the flag and bakery families. Declared only here: the dark block's department
+    values carry through the var() references.
+  */
+  --tag-green-bg: var(--dept-produce-bg);
+  --tag-green-ink: var(--dept-produce-ink);
+  --tag-wheat-bg: var(--dept-bakery-bg);
+  --tag-wheat-ink: var(--dept-bakery-ink);
+  --tag-red-bg: var(--dept-meat-bg);
+  --tag-red-ink: var(--dept-meat-ink);
+  --tag-blue-bg: var(--dept-dairy-bg);
+  --tag-blue-ink: var(--dept-dairy-ink);
+  --tag-teal-bg: var(--dept-frozen-bg);
+  --tag-teal-ink: var(--dept-frozen-ink);
+  --tag-amber-bg: var(--color-flag-bg);
+  --tag-amber-ink: var(--color-flag-text);
+  --tag-plum-bg: var(--dept-baking-bg);
+  --tag-plum-ink: var(--dept-baking-ink);
+  --tag-violet-bg: var(--dept-beverages-bg);
+  --tag-violet-ink: var(--dept-beverages-ink);
+
+  /*
+    Cook mode's timer tray is dark under BOTH themes: it is a layer over the recipe, not part of
+    it. Declared only here, so the dark block below inherits these rather than restating them.
+  */
+  --color-tray-bg: #1d1a16;
+  --color-tray-surface: #2c2721;
+  --color-tray-text: #f1ebe0;
+  --color-tray-muted: #b3a999;
+  --color-alarm-bg: #f0b429;
+  --color-alarm-text: #2b1c00;
+
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body: 'Figtree', system-ui, sans-serif;
+
+  --radius: 14px;
+  --radius-card: 18px;
+  --radius-pill: 999px;
+}
+[data-theme='dark'] {
+  --color-bg: #1a1714;
+  --color-surface: #23201b;
+  --color-surface-2: #2c2721;
+  --color-border: #3a332b;
+  --color-text: #f1ebe0;
+  --color-text-muted: #b3a999;
+  --color-accent: #5dbb8c;
+  --color-on-accent: #10231a;
+  --color-accent-soft: #1f3328;
+  --color-accent-soft-text: #9bd9b5;
+  --color-tag-ink: #e7bf85;
+  --color-leftover-bg: #3a2f1c;
+  --color-leftover-text: #e3b873;
+  --color-frozen-bg: #1e2e3e;
+  --color-frozen-text: #8fbbe6;
+  --color-flag-bg: #3a2f1c;
+  --color-flag-text: #f0c988;
+  --color-flag-border: #6b552c;
+
+  --dept-produce-bg: #1e2f22;
+  --dept-produce-ink: #9ed3ac;
+  --dept-bakery-bg: #33291c;
+  --dept-bakery-ink: #e3c08a;
+  --dept-meat-bg: #3a2220;
+  --dept-meat-ink: #efa79e;
+  --dept-dairy-bg: #1e2835;
+  --dept-dairy-ink: #a5c4ea;
+  --dept-frozen-bg: #1b2e32;
+  --dept-frozen-ink: #9ad3dc;
+  --dept-pantry-bg: #35291b;
+  --dept-pantry-ink: #e7bf85;
+  --dept-baking-bg: #33222a;
+  --dept-baking-ink: #e6a9c3;
+  --dept-beverages-bg: #26223a;
+  --dept-beverages-ink: #bdb2ec;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+}
+/* Form controls do not inherit the page's font on their own. */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}

@@ -1,0 +1,46 @@
+<?xml version="1.0"?>
+<!--
+  Hearth's Postgres. Start this FIRST: the hearth container runs its migrations on boot and
+  exits if the database is not there.
+
+  It publishes NO host port, deliberately, and that is the one place this template departs from
+  the usual unraid convention of addressing a container by the server's IP and a port (D37).
+  A published port would put Postgres on the LAN, which is where every other device in the house
+  is. The hearth container reaches it by name over the `hearth` network instead.
+-->
+<Container version="2">
+  <Name>hearth-db</Name>
+  <Repository>postgres:16</Repository>
+  <Registry>https://hub.docker.com/_/postgres</Registry>
+  <Network>hearth</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support/>
+  <Project/>
+  <Overview>
+    Postgres 16 for Hearth. Reachable only over the `hearth` docker network, by the name
+    `hearth-db` - no host port is published, so nothing on the LAN can connect to it.
+    Create the network first: docker network create hearth
+  </Overview>
+  <Category>Productivity: Tools:</Category>
+  <WebUI/>
+  <TemplateURL/>
+  <Icon/>
+  <!--
+    Docker's default json-file driver does not rotate, so a log grows until the array fills.
+    There is no `logging:` equivalent in an unraid template, so it goes here. 20 MB x 5 files
+    caps this container at 100 MB.
+  -->
+  <ExtraParams>--log-driver json-file --log-opt max-size=20m --log-opt max-file=5</ExtraParams>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires>A docker network named `hearth`: docker network create hearth</Requires>
+  <Config Name="Database directory" Target="/var/lib/postgresql/data" Default="/mnt/user/appdata/hearth/db" Mode="rw" Description="Where the database lives. Every recipe, meal plan and shopping list is in here: back it up." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/hearth/db</Config>
+  <Config Name="POSTGRES_DB" Target="POSTGRES_DB" Default="hearth" Mode="" Description="Database name. Must match the database in the hearth container's DATABASE_URL." Type="Variable" Display="always" Required="true" Mask="false">hearth</Config>
+  <Config Name="POSTGRES_USER" Target="POSTGRES_USER" Default="hearth" Mode="" Description="Database user. Must match the user in the hearth container's DATABASE_URL." Type="Variable" Display="always" Required="true" Mask="false">hearth</Config>
+  <Config Name="POSTGRES_PASSWORD" Target="POSTGRES_PASSWORD" Default="" Mode="" Description="Database password. Choose one and put the SAME value in the hearth container's DATABASE_URL. Left blank, Postgres refuses to start and says so in its log. It is only read on the very first start, when the data directory is created: changing it later edits nothing inside the database." Type="Variable" Display="always" Required="true" Mask="true"/>
+</Container>

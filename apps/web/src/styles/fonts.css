@@ -1,0 +1,31 @@
+/*
+  The two typefaces D49 chose, bundled with the app: no request leaves the box (Principle 1) and
+  they work offline, because the service worker precaches the woff2 files. Latin only: the other
+  subsets fontsource ships would only add to that precache.
+*/
+@font-face {
+  font-family: 'Fraunces';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('@fontsource-variable/fraunces/files/fraunces-latin-opsz-normal.woff2')
+    format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'Fraunces';
+  font-style: italic;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('@fontsource-variable/fraunces/files/fraunces-latin-opsz-italic.woff2')
+    format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'Figtree';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 300 900;
+  src: url('@fontsource-variable/figtree/files/figtree-latin-wght-normal.woff2')
+    format('woff2-variations');
+}

@@ -1,0 +1,135 @@
+/* AppShell.module.css — bottom bar on phone, left rail on desktop */
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  /* How much of the viewport's bottom edge the tab bar covers, so a screen's own sticky bar
+     can sit above it rather than under it. Zero on desktop, where the nav is a side rail. */
+  --nav-height: calc(57px + env(safe-area-inset-bottom));
+}
+.main {
+  flex: 1;
+  padding: 16px;
+}
+.rail {
+  display: flex;
+  order: 2;
+  position: sticky;
+  bottom: 0;
+  /* Above the page's own positioned bits (a card's tick, a file button), which otherwise
+     paint over a sticky bar that has no stacking order of its own. */
+  z-index: 20;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+}
+.brand,
+.add {
+  display: none;
+}
+.item {
+  flex: 1;
+  min-height: 56px;
+  padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  font-size: 11px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.item[aria-current='page'] {
+  color: var(--color-accent);
+  font-weight: 700;
+}
+/* On a phone the Recipes group is just its tab: the sub-items live in each screen's subnav. */
+.group {
+  flex: 1;
+  display: flex;
+}
+.subItems {
+  display: none;
+}
+.icon {
+  width: 22px;
+  height: 22px;
+  flex: none;
+}
+
+@media (min-width: 768px) {
+  .shell {
+    flex-direction: row;
+    --nav-height: 0px;
+  }
+  .rail {
+    order: 0;
+    flex-direction: column;
+    width: 200px;
+    border-top: none;
+    border-right: 1px solid var(--color-border);
+    padding: 16px 12px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+  }
+  .brand {
+    display: block;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 24px;
+    padding: 4px 8px 14px;
+  }
+  .add {
+    display: block;
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+    border: none;
+    border-radius: var(--radius-pill);
+    padding: 12px;
+    font-weight: 700;
+    text-align: center;
+    text-decoration: none;
+    margin-bottom: 14px;
+  }
+  .item {
+    flex: none;
+    min-height: 44px;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 11px;
+    font-size: 14px;
+    border-radius: 9px;
+  }
+  .item[aria-current='page'] {
+    background: var(--color-accent-soft);
+    color: var(--color-accent-soft-text);
+  }
+  .group {
+    flex: none;
+    flex-direction: column;
+  }
+  .subItems {
+    display: flex;
+    flex-direction: column;
+    margin: 2px 0 6px 20px;
+    padding-left: 12px;
+    border-left: 1px solid var(--color-border);
+  }
+  .subItem {
+    min-height: 36px;
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    border-radius: 8px;
+    color: var(--color-text-muted);
+    text-decoration: none;
+    font-size: 13.5px;
+  }
+  /* The parent already carries the highlight; the child is marked by ink and weight. */
+  .subItem[aria-current='page'] {
+    color: var(--color-accent-soft-text);
+    font-weight: 700;
+  }
+}

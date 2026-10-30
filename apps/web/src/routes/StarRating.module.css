@@ -1,0 +1,38 @@
+.stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  line-height: 1;
+}
+
+.small {
+  font-size: 14px;
+}
+
+.medium {
+  font-size: 22px;
+}
+
+.large {
+  font-size: 30px;
+}
+
+.star {
+  display: grid;
+  place-items: center;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: inherit;
+  cursor: pointer;
+}
+
+.on {
+  color: var(--color-alarm-bg);
+}
+
+.off {
+  color: var(--color-border);
+}

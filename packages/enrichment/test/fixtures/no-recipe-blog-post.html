@@ -1,0 +1,33 @@
+<!doctype html>
+<!--
+  HAND-AUTHORED. A page with no recipe on it, which is an ordinary thing for a cook to paste:
+  a link to an article ABOUT cooking rather than to the recipe itself. It carries JSON-LD, so
+  it also covers the case where structured data is present and simply is not a Recipe.
+-->
+<html lang="en">
+  <head>
+    <title>Why I stopped buying pre-ground pepper</title>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          { "@type": "WebSite", "name": "An old food blog" },
+          {
+            "@type": "Article",
+            "headline": "Why I stopped buying pre-ground pepper",
+            "author": { "@type": "Person", "name": "A cook" }
+          }
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <article>
+      <h1>Why I stopped buying pre-ground pepper</h1>
+      <p>
+        It goes stale. That is the whole post. A peppercorn keeps its oils until it is cracked,
+        and the tin on the shelf cracked them a year before it reached you.
+      </p>
+    </article>
+  </body>
+</html>

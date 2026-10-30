@@ -1,0 +1,45 @@
+name: CI
+on:
+  push: { branches: [main] }
+  pull_request: { branches: [main] }
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_USER: hearth, POSTGRES_PASSWORD: hearth, POSTGRES_DB: hearth }
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U hearth" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://hearth:hearth@localhost:5432/hearth
+      BETTER_AUTH_SECRET: ci-secret-must-be-at-least-32-characters
+      # The one origin-shaped value. `BETTER_AUTH_URL` and `WEB_ORIGIN` used to be set here too;
+      # the first is gone from the schema and the second is only this one's fallback.
+      PUBLIC_URL: http://localhost:5173
+    steps:
+      - uses: actions/checkout@v7
+      # action-setup reads the pinned version from package.json "packageManager".
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with: { node-version: 20, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @hearth/server db:migrate
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+
+  # The image, built but not pushed. Publishing only runs on main, so without this a Dockerfile
+  # that no longer builds is found after the merge; the web image failed that way for weeks.
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          push: false

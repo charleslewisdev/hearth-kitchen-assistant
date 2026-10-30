@@ -1,0 +1,151 @@
+/*
+  Entry.module.css - the three screens you can be on before you are inside a household:
+  sign in, accept an invitation, and the household you are not in yet.
+
+  One module rather than three, because they are one moment in the product and should not drift
+  apart: same card, same field, same button. Everything past this point lives in the app shell
+  and has its own module.
+*/
+.screen {
+  max-width: 380px;
+  margin: 0 auto;
+  padding: 48px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.title {
+  margin: 0;
+  font-size: 34px;
+  line-height: 1.1;
+}
+
+.body {
+  margin: 0;
+  color: var(--color-text);
+  line-height: 1.5;
+}
+
+.hint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.notice {
+  margin: 0;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.error {
+  margin: 0;
+  color: var(--color-leftover-text);
+  background: var(--color-leftover-bg);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+
+.sent {
+  margin: 0;
+  color: var(--color-accent-soft-text);
+  background: var(--color-accent-soft);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.input {
+  width: 100%;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  font: inherit;
+}
+
+.input:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.primary {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border: none;
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.secondary {
+  align-self: flex-start;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primary:disabled,
+.secondary:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.link {
+  align-self: flex-start;
+  color: var(--color-accent-soft-text);
+  font-weight: 600;
+}
+
+/* The first-boot disclosure on the sign-in screen. */
+.details {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+
+.summary {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.detailsBody {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 12px;
+}

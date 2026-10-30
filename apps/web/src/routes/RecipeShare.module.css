@@ -1,0 +1,147 @@
+/* RecipeShare.module.css — Share and Print on the recipe screen, and the sheet Print prints. */
+.share {
+  position: relative;
+}
+
+.buttons {
+  display: flex;
+  gap: 8px;
+}
+
+/* The header band's pill buttons (RecipeView's `.pillButton`), as buttons rather than links. */
+.pill {
+  height: 44px;
+  padding: 0 18px;
+  border: none;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-radius: var(--radius-pill);
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pill:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* A bubble under the buttons, over the cover, so the bar's layout never moves. */
+.status,
+.failed {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 1;
+  width: max-content;
+  max-width: 240px;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  font-size: 14px;
+}
+
+.status {
+  color: var(--color-accent-soft-text);
+}
+
+.failed {
+  color: var(--color-leftover-text);
+}
+
+.sheet {
+  display: none;
+}
+
+/*
+  Paper is always white, so the sheet is black on white in either theme; the tokens follow the
+  screen's theme and would print a dark page for a cook in dark mode.
+*/
+@media print {
+  :global(body[data-printing-recipe]) > :not([data-print-sheet]) {
+    display: none !important;
+  }
+
+  :global(body[data-printing-recipe]) {
+    background: white;
+  }
+
+  .sheet {
+    display: block;
+    color: black;
+    font-size: 12pt;
+    line-height: 1.4;
+  }
+
+  .title {
+    font-family: var(--font-display);
+    font-size: 24pt;
+    margin: 0 0 4pt;
+  }
+
+  .meta,
+  .source {
+    margin: 0 0 10pt;
+    font-size: 10pt;
+  }
+
+  .cover {
+    display: block;
+    max-width: 100%;
+    max-height: 3.5in;
+    object-fit: cover;
+    margin: 0 0 10pt;
+  }
+
+  .description {
+    margin: 0 0 12pt;
+    font-style: italic;
+  }
+
+  .heading {
+    font-family: var(--font-display);
+    font-size: 14pt;
+    margin: 12pt 0 6pt;
+    break-after: avoid;
+  }
+
+  .ingredients {
+    columns: 2;
+    column-gap: 24pt;
+    padding-left: 14pt;
+    margin: 0;
+  }
+
+  .ingredients li,
+  .steps li {
+    break-inside: avoid;
+  }
+
+  .steps {
+    padding-left: 18pt;
+    margin: 0;
+  }
+
+  .steps li + li {
+    margin-top: 6pt;
+  }
+
+  .source {
+    margin-top: 14pt;
+  }
+
+  /* A recipe the main one is made from, after a rule. */
+  .linked {
+    margin-top: 18pt;
+    padding-top: 12pt;
+    border-top: 1pt solid black;
+  }
+
+  .linked .title {
+    font-size: 18pt;
+    break-after: avoid;
+  }
+}

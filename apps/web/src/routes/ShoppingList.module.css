@@ -1,0 +1,296 @@
+/* ShoppingList.module.css — colour-coded department cards + sink-away check-off (D49). */
+.screen {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 760px;
+}
+
+.title {
+  margin: 0;
+  font-size: 34px;
+  line-height: 1.1;
+}
+
+.progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.progressTrack {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--color-surface-2);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--color-accent);
+  transition: width 200ms ease;
+}
+
+.progressText {
+  font-size: 14px;
+  color: var(--color-text-muted);
+}
+
+.status {
+  color: var(--color-text-muted);
+}
+
+.error {
+  color: var(--color-leftover-text);
+  background: var(--color-leftover-bg);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin: 0;
+}
+
+/* Add-staple bar pinned at the top of the list. */
+.addBar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  padding: 4px 4px 4px 18px;
+}
+
+.addInput {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  background: transparent;
+  color: var(--color-text);
+  border: none;
+  font: inherit;
+  font-size: 16px;
+}
+
+.addInput:focus {
+  outline: none;
+}
+
+.addBar:focus-within {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.addButton {
+  min-height: 44px;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: 0 20px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.addButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.clearBar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.clearButton {
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.clearButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+/* Each department's header wears its tint and ink (tokens.css); the name is always written. */
+.sectionHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--dept-bg);
+  color: var(--dept-ink);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 18px;
+}
+
+.sectionCount {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 4px 6px 4px 14px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.item:last-child {
+  border-bottom: none;
+}
+
+.itemLabel {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.check {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+.itemText {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.amount {
+  margin-left: auto;
+  padding-left: 8px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.name {
+  font-weight: 500;
+}
+
+.note {
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.itemDone .itemText,
+.itemDone .amount {
+  text-decoration: line-through;
+  color: var(--color-text-muted);
+}
+
+.remove {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  background: none;
+  border: none;
+  border-radius: var(--radius-pill);
+  color: var(--color-text-muted);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.remove:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.done {
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 6px 12px;
+}
+
+.doneSummary {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 6px 0;
+}
+
+.done .items {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+}
+
+.empty {
+  text-align: center;
+  padding: 40px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.emptyBody {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.emptyLink {
+  color: var(--color-accent-soft-text);
+  font-weight: 600;
+}
+
+.offline {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--color-flag-bg);
+  color: var(--color-flag-text);
+  border: 1px solid var(--color-flag-border);
+}
+
+/* Read by a screen reader, not shown. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

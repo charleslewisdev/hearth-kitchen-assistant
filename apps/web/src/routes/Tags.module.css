@@ -1,0 +1,220 @@
+/* Tags.module.css: the Foods screen's layout, plus the tag chip and colour swatches. */
+.screen {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.title {
+  margin: 0;
+  font-size: 34px;
+  line-height: 1.1;
+}
+
+.lead,
+.status {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.error {
+  color: var(--color-leftover-text);
+  background: var(--color-leftover-bg);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  margin: 0;
+}
+
+.notice {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-soft-text);
+}
+
+.search,
+.row select,
+.editor input,
+.editor select {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  font-size: 16px;
+  min-width: 0;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.row {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 8px 10px 8px 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The chip, then its count, on one line with Edit at the right. */
+.rowMain {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  align-items: center;
+}
+
+/* The editor spans the row under both. */
+.row > .editor {
+  grid-column: 1 / -1;
+}
+
+.name {
+  font-weight: 700;
+}
+
+.uses {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.rowControls {
+  display: flex;
+  gap: 8px;
+}
+
+.rowControls select {
+  flex: 1;
+}
+
+.textButton {
+  background: none;
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  border-radius: var(--radius-pill);
+  padding: 8px 14px;
+  min-height: 40px;
+  font-weight: 600;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 10px;
+}
+
+.editRow {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.editLabel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-weight: 600;
+  min-width: 0;
+}
+
+.button {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border: none;
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  min-height: 44px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.chip {
+  display: inline-block;
+  background: var(--chip-bg);
+  color: var(--chip-ink);
+  border-radius: var(--radius-pill);
+  padding: 3px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border: none;
+  margin: 0;
+  padding: 0;
+}
+
+.swatches legend {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  margin-bottom: 6px;
+  padding: 0;
+}
+
+.swatch {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  background: var(--chip-bg);
+  color: var(--chip-ink);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  box-shadow: inset 0 0 0 1px var(--color-border);
+}
+
+.swatch[aria-pressed='true'] {
+  border-color: var(--chip-ink);
+}
+
+.autoSwatch {
+  width: auto;
+  padding: 0 12px;
+  border-radius: var(--radius-pill);
+}
+
+.confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.danger {
+  background: var(--dept-meat-ink);
+  color: var(--color-surface);
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: 8px 16px;
+  font-weight: 700;
+  cursor: pointer;
+}

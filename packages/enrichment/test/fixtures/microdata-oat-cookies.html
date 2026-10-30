@@ -1,0 +1,55 @@
+<!doctype html>
+<!--
+  HAND-AUTHORED, like the others in this directory.
+
+  No reachable recipe site still emits microdata. Eight were checked on 2026-09-10 - Serious Eats,
+  AllRecipes, Budget Bytes, Minimalist Baker, Food.com, RecipeTin Eats, King Arthur and
+  Marmiton - and every one that answered emitted schema.org JSON-LD; none emitted microdata at
+  all. (Serious Eats and AllRecipes answered 403 and were not counted as evidence either way.)
+
+  Microdata support still earns its place, because it is what an older self-hosted blog or a
+  WordPress theme from the recipe-card era emits, and those are exactly the pages a cook has
+  bookmarked. So the shape is reproduced here from the schema.org Recipe vocabulary rather than
+  saved from a site, and the file says so rather than implying a provenance it does not have.
+-->
+<html lang="en">
+  <head>
+    <title>Oat cookies | An old food blog</title>
+  </head>
+  <body>
+    <article itemscope itemtype="http://schema.org/Recipe">
+      <h1 itemprop="name">Oat Cookies</h1>
+      <p>
+        Makes <span itemprop="recipeYield">24 cookies</span>, ready in
+        <meta itemprop="totalTime" content="PT35M" />35 minutes.
+      </p>
+      <span itemprop="recipeCategory">Dessert</span>
+      <span itemprop="recipeCuisine">American</span>
+
+      <h2>Ingredients</h2>
+      <ul>
+        <li itemprop="recipeIngredient">1 cup rolled oats</li>
+        <li itemprop="recipeIngredient">3/4 cup all-purpose flour</li>
+        <li itemprop="recipeIngredient">1/2 cup butter, softened</li>
+        <li itemprop="recipeIngredient">1/2 cup brown sugar, packed</li>
+        <li itemprop="recipeIngredient">1 large egg</li>
+        <li itemprop="recipeIngredient">1 tsp vanilla extract</li>
+        <li itemprop="recipeIngredient">1/2 tsp baking soda</li>
+        <li itemprop="recipeIngredient">1/4 tsp salt</li>
+      </ul>
+
+      <h2>Method</h2>
+      <ol>
+        <li itemprop="recipeInstructions">Heat the oven to 350F and line two baking sheets.</li>
+        <li itemprop="recipeInstructions">Cream the butter and brown sugar until pale.</li>
+        <li itemprop="recipeInstructions">Beat in the egg and the vanilla.</li>
+        <li itemprop="recipeInstructions">
+          Stir in the flour, baking soda and salt, then the oats.
+        </li>
+        <li itemprop="recipeInstructions">Drop spoonfuls onto the sheets and bake 12 minutes.</li>
+      </ol>
+
+      <p itemprop="keywords">cookies, oats, baking</p>
+    </article>
+  </body>
+</html>

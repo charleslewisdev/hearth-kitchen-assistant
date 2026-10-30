@@ -1,0 +1,349 @@
+/*
+  CookMode.module.css - the full-screen Focus view (D26).
+
+  Sizes here are larger than anywhere else in the app on purpose: this screen is read at arm's
+  length, tapped with messy hands, and often one-handed. Every control clears 48px except the
+  duration phrases inside a step, which sit in a line of text and clear 44px.
+*/
+.screen {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.status {
+  padding: 24px 16px;
+  color: var(--color-text-muted);
+}
+
+/* Top bar: always reachable, so the way out never needs a scroll. */
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  padding-top: max(8px, env(safe-area-inset-top));
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 48px;
+  padding: 0 10px;
+  border-radius: var(--radius);
+  color: var(--color-accent);
+  font-size: 18px;
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.backWord {
+  font-size: 15px;
+}
+
+.heading {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.progress {
+  margin: 2px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+/* The single scroll of steps. The bottom padding is the timer tray's room: the tray is fixed,
+   so without it the last step hides underneath the last timer. 280px covers the tray at its
+   tallest, which TimerTray.module.css caps at 200px of rows plus its own padding. */
+.steps {
+  list-style: none;
+  margin: 0;
+  padding: 12px 12px 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.step {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font-size: 17px;
+  line-height: 1.5;
+}
+
+/* The current step, enlarged. */
+.stepCurrent {
+  composes: step;
+  font-size: 21px;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
+}
+
+/*
+  A done step: recessed AND ticked AND struck through. Three signals rather than one, because a
+  colour shift alone is the signal that fails first in bright kitchen light.
+
+  The dimming is on the step TEXT rather than on the card, so it cannot drag the tick or the
+  border down with it: at 0.75 over the recessed card the text still clears 6:1, where dimming
+  the whole card to the same degree put the white tick on accent at about 2:1.
+*/
+.stepDone {
+  composes: step;
+  background: var(--color-surface-2);
+}
+
+.stepDone .stepText {
+  opacity: 0.75;
+  text-decoration: line-through;
+}
+
+.toggle {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* Stretch the tap target over the whole card. Nothing else in the row takes pointer events
+   except the timer phrases, which opt back in below. */
+.toggle::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius);
+}
+
+.toggle:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.stepDone .toggle {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.stepText {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-width: 0;
+  pointer-events: none;
+  padding-top: 10px;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/*
+  A duration inside a step. It opts back into pointer events that .stepText gives up, so a tap
+  on the phrase starts its timer while a tap anywhere else on the card ticks the step off.
+*/
+.timerPhrase {
+  pointer-events: auto;
+  /*
+    inline-flex with a floor on the height, so the phrase is a chip inside the sentence rather
+    than a line of text with a border. WCAG 2.2's target-size minimum exempts a target inline
+    in a sentence; a cook with a wet thumb does not care what it exempts.
+  */
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  vertical-align: middle;
+  margin: 0;
+  padding: 2px 10px;
+  border: 2px solid var(--color-accent);
+  border-radius: 8px;
+  background: var(--color-accent-soft);
+  color: var(--color-accent-soft-text);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.timerPhrase:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.peekButton {
+  flex: none;
+  min-height: 48px;
+  padding: 0 16px;
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-soft-text);
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.peekButton:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* The ingredient peek: a bottom sheet over the steps, stacked ON TOP of the timer tray. */
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 6;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+/*
+  The one fixed layer at the bottom of cook mode, holding the peek above the tray. Both used to
+  be fixed at bottom:0 in their own right, which drew the sheet over the tray and put a firing
+  timer's Stop button out of reach behind it.
+
+  It does not take pointer events itself, so the empty space above a short sheet still belongs
+  to the scrim behind it; its children take them back.
+*/
+.dock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 7;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  max-height: 100vh;
+  max-height: 100dvh;
+  pointer-events: none;
+}
+
+.dock > * {
+  pointer-events: auto;
+}
+
+.sheet {
+  /* min-height:0 so the sheet, not the dock, is what gives way when both are tall. */
+  min-height: 0;
+  max-height: 76vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.3);
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+
+.sheetBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.sheetTitle {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.sheetClose {
+  min-height: 48px;
+  padding: 0 16px;
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.sheetClose:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.peekList {
+  list-style: none;
+  margin: 0;
+  padding: 10px 14px 14px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.peekItem {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 17px;
+  line-height: 1.4;
+}
+
+.peekAmount {
+  font-weight: 800;
+  color: var(--color-accent-soft-text);
+}
+
+.peekFood {
+  font-weight: 500;
+}
+
+.peekNote {
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.peekLink {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-accent);
+}

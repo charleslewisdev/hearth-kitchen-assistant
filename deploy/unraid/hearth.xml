@@ -1,0 +1,60 @@
+<?xml version="1.0"?>
+<!--
+  Hearth: the API and the web app, in one container (D46). Start it after hearth-db.
+
+  It joins the `hearth` network to reach Postgres by name, and publishes one port for your
+  reverse proxy (or your browser, on the LAN) to reach it.
+
+  BETTER_AUTH_SECRET is deliberately NOT a field. Left unset, the server generates one on first
+  boot into the data directory and reuses it forever. Add it by hand only if you must supply
+  your own, and then it must be at least 32 characters.
+-->
+<Container version="2">
+  <Name>hearth</Name>
+  <Repository>ghcr.io/charleslewisdev/hearth:latest</Repository>
+  <Registry>https://github.com/charleslewisdev/hearth-kitchen-assistant/pkgs/container/hearth</Registry>
+  <Network>hearth</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support/>
+  <Project/>
+  <Overview>
+    Hearth: a household recipe box, meal planner and shopping list. Runs its database migrations
+    on boot, then serves the app on port 3000 inside the container.
+
+    ON FIRST BOOT it writes a setup token to its log, the credential that creates the first
+    account. Read it before you hand the address to anyone: docker logs hearth
+  </Overview>
+  <Category>Productivity: Tools:</Category>
+  <WebUI>http://[IP]:[PORT:8484]/</WebUI>
+  <TemplateURL/>
+  <Icon/>
+  <!--
+    Restart policy unless-stopped: this container EXITS if Postgres is not accepting connections when
+    it boots (migrations run first), and unraid has no depends_on, so after a reboot it races
+    hearth-db. The restart policy makes the loser retry. It respects a stop from the UI.
+    Memory cap of 2g: OCR and PDF import peak around 270 MB; the cap is headroom, not a target.
+    Log rotation because docker's default json-file driver never rotates.
+  -->
+  <ExtraParams>--restart unless-stopped --memory=2g --log-driver json-file --log-opt max-size=20m --log-opt max-file=5</ExtraParams>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires>The `hearth` docker network, and hearth-db running on it.</Requires>
+  <Config Name="Web port" Target="3000" Default="8484" Mode="tcp" Description="Host port for the app. Point your reverse proxy at [unraid IP]:[this port]." Type="Port" Display="always" Required="true" Mask="false">8484</Config>
+  <Config Name="Data directory" Target="/data" Default="/mnt/user/appdata/hearth/data" Mode="rw" Description="Holds the auth secret generated on first boot, and the first-boot setup token. MUST PERSIST: lose it and every member of the household is signed out." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/hearth/data</Config>
+  <Config Name="DATABASE_URL" Target="DATABASE_URL" Default="postgres://hearth:CHANGE_ME@hearth-db:5432/hearth" Mode="" Description="Replace CHANGE_ME with the POSTGRES_PASSWORD set on hearth-db. The host is the container name, resolved on the `hearth` network." Type="Variable" Display="always" Required="true" Mask="false">postgres://hearth:CHANGE_ME@hearth-db:5432/hearth</Config>
+  <Config Name="PUBLIC_URL" Target="PUBLIC_URL" Default="" Mode="" Description="The address a browser uses, e.g. https://hearth.example.com. Scheme and host only. It is the auth base URL and trusted origin, and its https scheme is what marks session cookies Secure. Set it before anyone signs in." Type="Variable" Display="always" Required="true" Mask="false"/>
+  <Config Name="TRUST_PROXY" Target="TRUST_PROXY" Default="0" Mode="" Description="Who may tell Hearth the real client address. Behind a reverse proxy, put that proxy's IP as unraid sees it (e.g. your firewall's LAN address for HAProxy on pfSense). A hop count (1) also works but trusts any machine that can reach the port. 0 trusts nobody: then every visitor shares one rate-limit bucket." Type="Variable" Display="always" Required="true" Mask="false">0</Config>
+  <Config Name="NODE_ENV" Target="NODE_ENV" Default="production" Mode="" Description="Leave as production. It makes logs JSON and makes the server refuse to start on the development secret published in the repository." Type="Variable" Display="advanced" Required="true" Mask="false">production</Config>
+  <Config Name="LOG_LEVEL" Target="LOG_LEVEL" Default="info" Mode="" Description="fatal, error, warn, info, debug, trace or silent. Never silent without SMTP: invitation and verification links are then delivered only by being written to this log." Type="Variable" Display="advanced" Required="true" Mask="false">info</Config>
+  <Config Name="SMTP_HOST" Target="SMTP_HOST" Default="" Mode="" Description="Your mail relay. Blank: Hearth sends no mail and writes invitation and verification links to its log instead. Anyone who can read the log can then accept an invitation." Type="Variable" Display="always" Required="false" Mask="false"/>
+  <Config Name="SMTP_PORT" Target="SMTP_PORT" Default="587" Mode="" Description="587 with SMTP_SECURE=false (STARTTLS), or 465 with SMTP_SECURE=true." Type="Variable" Display="advanced" Required="false" Mask="false">587</Config>
+  <Config Name="SMTP_SECURE" Target="SMTP_SECURE" Default="false" Mode="" Description="true for implicit TLS on 465, false for STARTTLS on 587." Type="Variable" Display="advanced" Required="false" Mask="false">false</Config>
+  <Config Name="SMTP_USER" Target="SMTP_USER" Default="" Mode="" Description="Relay username. Set both this and SMTP_PASS, or neither." Type="Variable" Display="always" Required="false" Mask="false"/>
+  <Config Name="SMTP_PASS" Target="SMTP_PASS" Default="" Mode="" Description="Relay password. Never written to a log line." Type="Variable" Display="always" Required="false" Mask="true"/>
+  <Config Name="SMTP_FROM" Target="SMTP_FROM" Default="" Mode="" Description="The From address, on a domain your relay may send for." Type="Variable" Display="always" Required="false" Mask="false"/>
+</Container>

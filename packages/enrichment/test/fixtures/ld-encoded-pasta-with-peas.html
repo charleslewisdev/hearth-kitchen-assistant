@@ -1,0 +1,90 @@
+<!DOCTYPE html><!--
+  HAND-AUTHORED. An invented recipe, not copied from any site. It keeps one markup shape real
+  recipe sites emit, which from-html.test.ts asserts against: HTML entities inside JSON-LD strings, and a second, unrelated script block.
+-->
+<html lang="en"><head><meta charset="utf-8"><title>Pasta with Peas (weeknight)</title>
+<script type="application/ld+json">{
+ "@context": "https://schema.org",
+ "@graph": [
+  {
+   "@type": "Article",
+   "headline": "Pasta with Peas"
+  },
+  {
+   "@type": "WebPage",
+   "@id": "https://www.example.com/pasta-with-peas/"
+  },
+  {
+   "@type": "Recipe",
+   "name": "Pasta with Peas (weeknight)",
+   "recipeYield": [
+    "4"
+   ],
+   "prepTime": "PT5M",
+   "cookTime": "PT15M",
+   "recipeIngredient": [
+    "150g/5 oz  smoked bacon, ( weight after rind removed (Note 1))",
+    "2  large eggs ((Note 2))",
+    "1 cup frozen peas",
+    "1  garlic clove",
+    "1/2 cup grated pecorino",
+    "1 Tbsp olive oil",
+    "350g/12 oz  short pasta",
+    "1/4 cup chopped mint",
+    "1 lemon",
+    "1/2 tsp black pepper",
+    "Salt"
+   ],
+   "recipeInstructions": [
+    {
+     "@type": "HowToStep",
+     "text": "Bacon - Cut into 0.5cm / 1/5&quot; thick batons."
+    },
+    {
+     "@type": "HowToStep",
+     "text": "Eggs &amp; cheese - Whisk in a bowl with the pepper."
+    },
+    {
+     "@type": "HowToStep",
+     "text": "Pasta - Boil in well salted water."
+    },
+    {
+     "@type": "HowToStep",
+     "text": "Peas - Add to the pasta for the last two minutes."
+    },
+    {
+     "@type": "HowToStep",
+     "text": "Frying - Brown the bacon in the oil with the garlic."
+    },
+    {
+     "@type": "HowToStep",
+     "text": "Combine - Drain the pasta, saving a cup of the water."
+    },
+    {
+     "@type": "HowToStep",
+     "text": "Sauce - Off the heat, toss with the egg mix and a splash of the water."
+    },
+    {
+     "@type": "HowToStep",
+     "text": "Finish - Add the mint and the lemon zest."
+    }
+   ],
+   "recipeCategory": [
+    "Mains"
+   ],
+   "recipeCuisine": [
+    "Italian"
+   ],
+   "keywords": "pasta, peas"
+  }
+ ]
+}</script>
+<script type="application/ld+json">{
+ "@context": "https://schema.org",
+ "@type": "NewsArticle",
+ "headline": "An unrelated story"
+}</script>
+</head>
+<body><nav><a href="/">Home</a> <a href="/recipes">Recipes</a></nav>
+<main><h1>Pasta with Peas (weeknight)</h1><p>Scroll past the story to the recipe card.</p></main>
+<footer><p>Sample page for parser tests.</p></footer></body></html>

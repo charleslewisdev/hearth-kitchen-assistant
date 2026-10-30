@@ -1,0 +1,139 @@
+.wrap {
+  position: relative;
+}
+
+/* Looks like the form's other inputs: the chips and the typing box share one bordered field. */
+.box {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 48px;
+  padding: 6px 10px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  cursor: text;
+}
+
+.box:focus-within {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.boxFlagged {
+  border-color: var(--color-flag-border);
+  background: var(--color-flag-bg);
+}
+
+.chips {
+  display: contents;
+  list-style: none;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--chip-bg);
+  color: var(--chip-ink);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  padding: 2px 4px 2px 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* A tag the household does not have yet: saving the recipe creates it. */
+.newChip {
+  border: 1px dashed var(--chip-ink);
+  background: var(--color-surface);
+}
+
+.newBadge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+.remove {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: inherit;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.remove:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.input {
+  flex: 1;
+  min-width: 120px;
+  border: none;
+  outline: none;
+  background: none;
+  color: var(--color-text);
+  padding: 6px 2px;
+  font-size: 16px; /* iOS zooms the page on focus below 16px. */
+}
+
+.list {
+  position: absolute;
+  z-index: 5;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 44px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.optionActive {
+  background: var(--color-surface-2);
+}
+
+.optionChip {
+  background: var(--chip-bg);
+  color: var(--chip-ink);
+  border-radius: var(--radius-pill);
+  padding: 2px 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.optionCount {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.create {
+  font-weight: 600;
+  color: var(--color-accent-soft-text);
+}

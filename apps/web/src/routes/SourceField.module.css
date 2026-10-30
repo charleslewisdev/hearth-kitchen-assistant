@@ -1,0 +1,13 @@
+/* A one-tap fix under the Source box, when what is typed looks like a source already in use. */
+.similar {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 6px 12px;
+  border: 1px dashed var(--color-accent);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-soft-text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}

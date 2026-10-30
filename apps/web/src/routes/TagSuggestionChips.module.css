@@ -1,0 +1,28 @@
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-right: 2px;
+}
+
+.chip {
+  border: 1px dashed var(--chip-ink);
+  background: var(--chip-bg);
+  color: var(--chip-ink);
+  border-radius: var(--radius-pill);
+  min-height: 32px;
+  padding: 4px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
