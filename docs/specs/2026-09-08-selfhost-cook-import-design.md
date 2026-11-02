@@ -4,7 +4,7 @@
 > the author runs on unraid, invites family into, cooks from, and imports into.
 > Supersedes nothing; extends the approved
 > [P1 recipe-core design](2026-06-21-p1-recipe-core-design.md) and drains the
-> [P0 deferred/hardening backlog](../plans/2026-06-19-p0-deferred-and-hardening.md).
+> [P0 deferred/hardening backlog](https://github.com/charleslewisdev/hearth-kitchen-assistant/blob/670fb00a1a487f6079559506ae1da19b5c35b341/docs/plans/2026-06-19-p0-deferred-and-hardening.md).
 
 _Authored: 2026-09-08_
 

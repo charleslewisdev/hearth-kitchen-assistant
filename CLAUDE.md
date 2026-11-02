@@ -17,7 +17,7 @@ A self-hosted, invite-only household app for recipes, shopping lists and (later)
 - `packages/shared` stays pure: no node, DB or network imports. Keep every regex over untrusted text linear: bound repetitions (`{0,200}`) or put a lookbehind such as `(?<!\d)` before a leading `\d+` or `\s+`, and add a timed hostile-input test. Unbounded patterns have frozen the server twice and cook mode once.
 - Logs are ids-only (D38, D40): no user content in log lines or thrown messages.
 - Nothing AI-backed exists, and core flows must work without it. Import is deterministic; OCR runs in the box.
-- Design specs are in `docs/specs/`, implementation plans in `docs/plans/`. `docs/plans/2026-06-19-p0-deferred-and-hardening.md` is the live hardening backlog.
+- Design specs are in `docs/specs/`. Implementation plans in `docs/plans/` are local and git-ignored. Open work is in `docs/ROADMAP.md` and `docs/DECISION_LOG.md`.
 
 ## Pitfalls
 - **Tests truncate whatever `DATABASE_URL` in `.env` points at, which is the dev database.** Don't run them against data you want to keep.
