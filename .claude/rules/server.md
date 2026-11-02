@@ -1,7 +1,8 @@
 ---
 paths:
-  - "apps/server/src/**"
+  - 'apps/server/src/**'
 ---
+
 # Server code
 
 - Reach tenant data only through `withHousehold(householdId, tx => ...)` (`src/repo/tenant.ts`), which sets the `hearth_app` role and `app.current_household`; each repo query also adds its own `where(householdId)`. ESLint bans importing `db/client` outside `repo/**`, `db/**`, `auth.ts` and `auth-invite.ts`.
@@ -11,4 +12,3 @@ paths:
 - Ids-only logging (D38, D40): never log `err.message`, request input or tRPC `?input=`; every `err` call site passes its own message. Own every logger, including Better Auth's. A pino child's level replaces its parent's, so use `noQuieterThan` (log.ts) wherever a line must survive `LOG_LEVEL=warn`.
 - New env vars go in `env.ts`: wrap optional ones in `z.preprocess(blankIsAbsent, ...)` (an empty `PORT` once became port 0), and use `envBoolean(...)` for flags, never `z.coerce.boolean`. Add each to `.env.example`, `docker-compose.yml`, `deploy/unraid/*.xml` and CI.
 - Strings the web client must spell exactly as the server does (it matches on them, sends them or shows them on its own) go in `src/messages.ts`, which imports nothing. A message the server only throws stays beside the code that throws it.
-- Only `ENOENT` on the secret file means first boot; any other error must fail, not regenerate and log everyone out (see `secret.ts`).
