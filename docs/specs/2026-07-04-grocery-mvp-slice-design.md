@@ -15,7 +15,7 @@ The MVP the author will actually use weekly is: **plan groceries from recipes, t
 
 ## Scope — keep / trim / add
 
-Relative to the [P1 recipe-core plan](../plans/2026-06-21-p1-recipe-core.md):
+Relative to the [P1 recipe-core plan](https://github.com/charleslewisdev/hearth-kitchen-assistant/blob/670fb00a1a487f6079559506ae1da19b5c35b341/docs/plans/2026-06-21-p1-recipe-core.md):
 
 ### Keep unchanged (the foundation — no trimming)
 - **Phase A** — the full 6-table recipe schema + RLS on every table. Bedrock.
