@@ -60,3 +60,6 @@ docker-compose.override.yml
 # breaks the suite. Naming them `scratch-*` at least keeps them from being committed.
 scratch-*
 .claude/worktrees/
+
+# Plans and design records are working files for Claude, not documentation
+docs/plans/
