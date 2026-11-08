@@ -234,6 +234,20 @@ describe('saving', () => {
     expect(mutateAsync.mock.calls[0]?.[0]).toMatchObject({ servings: 4, servingsHigh: 8 });
   });
 
+  it('says so when the servings are raised past the range, and saves none', async () => {
+    renderReview(
+      makeDraft({
+        servings: { value: 4, confidence: 'high', raw: 'Serves 4-6' },
+        servingsHigh: 6,
+      }),
+    );
+    fireEvent.change(screen.getByLabelText(/servings/i), { target: { value: '6' } });
+    expect(screen.getByText(/up to has to be more than 6/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /save recipe/i }));
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
+    expect(mutateAsync.mock.calls[0]?.[0]).toMatchObject({ servings: 6, servingsHigh: null });
+  });
+
   it("links a photo or PDF import's kept draft to the saved recipe", async () => {
     renderReview(
       makeDraft({

@@ -12,6 +12,7 @@ import { SourceField } from './SourceField';
 import { TagSuggestionChips } from './TagSuggestionChips';
 import styles from './ImportReview.module.css';
 import { servingsHighFrom } from '../lib/servings';
+import { ServingsHighHint } from './ServingsHighHint';
 
 /**
  * Reviewing an imported draft before it becomes a recipe (D29).
@@ -278,6 +279,9 @@ export function ImportReview({
   const canSave =
     title.value.trim() !== '' && typedSourceUrl !== 'invalid' && !create.isPending && !keeping;
 
+  const servingsHighIgnored =
+    servingsHighText.trim() !== '' && servingsHighFrom(servingsHighText, servings.value) === null;
+
   async function handleSave() {
     if (!canSave) return;
     const saved = await create.mutateAsync({
@@ -378,10 +382,14 @@ export function ImportReview({
               inputMode="numeric"
               className={styles.input}
               value={servingsHighText}
+              aria-describedby={servingsHighIgnored ? 'servings-high-hint' : undefined}
               onChange={(e) => setServingsHighText(e.target.value)}
             />
           </label>
         </div>
+        <p id="servings-high-hint" className={styles.hint} aria-live="polite">
+          {servingsHighIgnored && <ServingsHighHint servings={servings.value} />}
+        </p>
         {servings.flagged && (
           <Flag id="servings-flag">
             {servings.raw === null

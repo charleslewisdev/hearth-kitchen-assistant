@@ -69,6 +69,11 @@ describe('parseQuantityRange', () => {
     expect(parseQuantityRange('2-')).toEqual({ low: 2, high: null });
   });
 
+  it('reads an amount that divides by zero as no amount, at either end', () => {
+    expect(parseQuantityRange('1-1/0')).toEqual({ low: 1, high: null });
+    expect(parseQuantityRange('1/0')).toBeNull();
+  });
+
   it('is null without a leading amount', () => {
     expect(parseQuantityRange('')).toBeNull();
     expect(parseQuantityRange('a few')).toBeNull();

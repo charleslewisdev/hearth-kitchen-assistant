@@ -399,6 +399,8 @@ describe('how many it serves', () => {
     expect(withYield('Serves 6').servingsHigh).toBeNull();
     expect(withYield('Serves 6-4').servingsHigh).toBeNull();
     expect(withYield('Serves 8 - Prep 10 minutes').servingsHigh).toBeNull();
+    // The 9 of a pan size is not a serving count.
+    expect(withYield('Makes 1 - 9x13 pan').servingsHigh).toBeNull();
   });
 
   it('does not take the end of a range as the whole count', () => {

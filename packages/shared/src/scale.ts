@@ -53,8 +53,8 @@ export function scaleRange(
   servings: { from: number; to: number },
 ): { quantity: number | null; quantityHigh: number | null } {
   const { quantity, quantityHigh, mode } = ingredient;
-  return {
-    quantity: scale({ quantity, mode }, servings),
-    quantityHigh: quantity === null ? null : scale({ quantity: quantityHigh, mode }, servings),
-  };
+  const low = scale({ quantity, mode }, servings);
+  const high = low === null ? null : scale({ quantity: quantityHigh, mode }, servings);
+  // Rounding a tiny range to 3 places can bring the ends together: then it is one amount.
+  return { quantity: low, quantityHigh: high !== null && low !== null && high > low ? high : null };
 }

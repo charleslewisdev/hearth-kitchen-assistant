@@ -44,6 +44,11 @@ describe('scaleRange', () => {
       { quantity: 1, quantityHigh: 2 },
     );
   });
+  it('is one amount when rounding brings the ends together', () => {
+    expect(
+      scaleRange({ quantity: 0.0001, quantityHigh: 0.0002, mode: 'linear' }, { from: 4, to: 4 }),
+    ).toEqual({ quantity: 0, quantityHigh: null });
+  });
   it('has no high end without a low one', () => {
     expect(
       scaleRange({ quantity: null, quantityHigh: 2, mode: 'linear' }, { from: 4, to: 8 }),

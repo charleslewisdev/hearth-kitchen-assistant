@@ -22,6 +22,7 @@ import { TagSuggestionChips } from './TagSuggestionChips';
 import styles from './RecipeEdit.module.css';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
 import { servingsHighFrom } from '../lib/servings';
+import { ServingsHighHint } from './ServingsHighHint';
 
 const MEAL_TYPES = RECIPE_TYPES;
 type MealType = RecipeType;
@@ -288,13 +289,13 @@ export function RecipeEdit() {
               aria-describedby={servingsHighIgnored ? 'servings-high-hint' : undefined}
               onChange={(e) => setServingsHighText(e.target.value)}
             />
-            {servingsHighIgnored && (
-              <span id="servings-high-hint" className={styles.hint}>
-                More than {servings} makes a range; this will be left out.
-              </span>
-            )}
           </label>
         </div>
+        {/* Outside the label so it is not read as part of the field's name; polite so a screen
+            reader hears it when it appears. */}
+        <p id="servings-high-hint" className={styles.hint} aria-live="polite">
+          {servingsHighIgnored && <ServingsHighHint servings={servings} />}
+        </p>
 
         <fieldset className={styles.field}>
           <legend className={styles.label}>Recipe type</legend>

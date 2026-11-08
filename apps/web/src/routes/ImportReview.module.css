@@ -194,3 +194,10 @@
   grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
+
+/* The note under the servings pair when "Up to" will not make a range. */
+.hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}

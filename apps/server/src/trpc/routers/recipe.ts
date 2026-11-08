@@ -60,7 +60,7 @@ const recipeFields = {
   title: z.string().min(1),
   servings: z.number().int().positive().default(1),
   // The high end of a servings range (D53); must be above `servings`, checked below.
-  servingsHigh: z.number().int().positive().nullable().optional(),
+  servingsHigh: z.number().int().positive().max(10_000).nullable().optional(),
   mealTypes: z.array(z.enum(MEAL_TYPES)).default([]),
   tags: z.array(z.string()).default([]),
   ingredientLines: z.array(z.string()).default([]),

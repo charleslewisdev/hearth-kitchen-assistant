@@ -279,7 +279,7 @@ describe('RecipeEdit ranges (D53)', () => {
     );
 
     fireEvent.change(upTo, { target: { value: '3' } });
-    expect(screen.getByText(/more than 4 makes a range/i)).toBeInTheDocument();
+    expect(screen.getByText(/up to has to be more than 4/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(createMutateAsync).toHaveBeenLastCalledWith(
       expect.objectContaining({ servings: 4, servingsHigh: null }),

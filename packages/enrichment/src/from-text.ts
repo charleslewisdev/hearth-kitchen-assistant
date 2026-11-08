@@ -287,7 +287,7 @@ function withoutPrintChrome(text: string): string {
  */
 const SERVINGS_PATTERNS = [
   /(?<![\w\-–])(\d{1,3})(?:\s{0,3}(?:[-–]|to)\s{0,3}(\d{1,3}))?\s{1,3}(?:servings?|portions?)\b/i,
-  /\b(?:serves|makes|yields?)\b:?\s{0,3}(?:about\s+|around\s+|roughly\s+)?(\d{1,3})(?:\s{0,3}(?:[-–]|to)\s{0,3}(\d{1,3}))?(?!\d)/i,
+  /\b(?:serves|makes|yields?)\b:?\s{0,3}(?:about\s+|around\s+|roughly\s+)?(\d{1,3})(?:\s{0,3}(?:[-–]|to)\s{0,3}(\d{1,3}))?(?![\dx×])/i,
 ] as const;
 
 /**

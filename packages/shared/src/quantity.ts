@@ -55,8 +55,13 @@ export function parseQuantity(input: string): number | null {
   return parseQuantityRange(input)?.low ?? null;
 }
 
-/** One amount, with no range in it. */
+/** One amount, with no range in it; null for one that is not a finite number ("1/0"). */
 function parseAmount(text: string): number | null {
+  const value = parseAmountOrInfinity(text);
+  return value !== null && Number.isFinite(value) ? value : null;
+}
+
+function parseAmountOrInfinity(text: string): number | null {
   if (text === '') return null;
 
   const fractionChars = UNICODE_FRACTION_CHARS.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

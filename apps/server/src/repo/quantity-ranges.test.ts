@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { resetDb } from '../../test/db';
-import { createHousehold } from '../../test/factories';
+import { createHousehold, liftHouseholdCap } from '../../test/factories';
 import { importDraft, recipe, recipeIngredient } from '../db/schema';
 import { withHousehold } from './tenant';
 import { createRecipe, getRecipe, searchRecipes, updateRecipe } from './recipes';
@@ -214,5 +214,39 @@ describe('backfillQuantityRanges', () => {
     // A second start finds nothing more to do, and changes nothing.
     expect(await backfillQuantityRanges()).toBe(0);
     expect((await getRecipe(a, id))!.ingredients).toEqual(lines);
+  });
+
+  it('leaves a line saved with another unit, and fills every household', async () => {
+    await liftHouseholdCap();
+    const a = await createHousehold();
+    const b = await createHousehold();
+    const first = await createRecipe(a, { title: 'Aioli', ingredientLines: ['2-3 cloves garlic'] });
+    const second = await createRecipe(b, {
+      title: 'Bread',
+      ingredientLines: ['2-3 cloves garlic', '1-2 tsp salt'],
+    });
+    await withHousehold(a, (tx) =>
+      tx
+        .update(recipeIngredient)
+        .set({ quantityHigh: null })
+        .where(eq(recipeIngredient.recipeId, first.id)),
+    );
+    await withHousehold(b, async (tx) => {
+      await tx
+        .update(recipeIngredient)
+        .set({ quantityHigh: null })
+        .where(eq(recipeIngredient.recipeId, second.id));
+      // Saved as tablespoons, which the parser does not read out of the line today.
+      await tx
+        .update(recipeIngredient)
+        .set({ unit: 'tbsp' })
+        .where(and(eq(recipeIngredient.recipeId, second.id), eq(recipeIngredient.position, 1)));
+    });
+
+    expect(await backfillQuantityRanges()).toBe(2);
+    expect((await getRecipe(a, first.id))!.ingredients[0]).toMatchObject({ quantityHigh: 3 });
+    const [garlic, salt] = (await getRecipe(b, second.id))!.ingredients;
+    expect(garlic).toMatchObject({ quantityHigh: 3 });
+    expect(salt).toMatchObject({ quantity: 1, quantityHigh: null, unit: 'tbsp' });
   });
 });

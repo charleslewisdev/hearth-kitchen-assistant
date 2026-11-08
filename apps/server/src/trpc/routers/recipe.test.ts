@@ -118,6 +118,9 @@ describe('recipe.list search parameters', () => {
     expect(
       await codeOf(caller.recipe.update({ id, title: 'Chili', servings: 6, servingsHigh: 4 })),
     ).toBe('BAD_REQUEST');
+    expect(
+      await codeOf(caller.recipe.create({ title: 'Chili', servings: 4, servingsHigh: 10_001 })),
+    ).toBe('BAD_REQUEST');
     expect(await caller.recipe.get({ idOrSlug: id })).toMatchObject({
       servings: 4,
       servingsHigh: 6,
