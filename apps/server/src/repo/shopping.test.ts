@@ -203,6 +203,70 @@ describe('shopping-list repository (add recipe: aggregation)', () => {
     expect(active!.quantity).toBe(3); // the newly-needed cups are visible
   });
 
+  it('merges the same food across one unit family, in the larger measure (#17)', async () => {
+    const a = await createHousehold();
+    const cup = await createRecipe(a, {
+      title: 'Cup',
+      servings: 1,
+      ingredientLines: ['1 cup flour'],
+    });
+    const tbsp = await createRecipe(a, {
+      title: 'Spoons',
+      servings: 1,
+      ingredientLines: ['4 tbsp flour', '8 oz chicken'],
+    });
+    const lb = await createRecipe(a, {
+      title: 'Pound',
+      servings: 1,
+      ingredientLines: ['1 lb chicken'],
+    });
+
+    await addRecipeToList(a, tbsp.id, 1); // 4 tbsp flour, 8 oz chicken
+    await addRecipeToList(a, cup.id, 1); // + 1 cup: kept in cups
+    const { items } = await addRecipeToList(a, lb.id, 1); // + 1 lb: kept in lb
+
+    const flour = items.filter((i) => i.name === 'flour');
+    expect(flour).toHaveLength(1);
+    expect(flour[0]).toMatchObject({ quantity: 1.25, unit: 'cup' });
+    const chicken = items.filter((i) => i.name === 'chicken');
+    expect(chicken).toHaveLength(1);
+    expect(chicken[0]).toMatchObject({ quantity: 1.5, unit: 'lb' });
+  });
+
+  it('keeps the unit on the list when the add is in the other system', async () => {
+    const a = await createHousehold();
+    const grams = await createRecipe(a, {
+      title: 'G',
+      servings: 1,
+      ingredientLines: ['500 g sugar'],
+    });
+    const cups = await createRecipe(a, {
+      title: 'Oz',
+      servings: 1,
+      ingredientLines: ['1 lb sugar'],
+    });
+
+    await addRecipeToList(a, grams.id, 1);
+    const { items } = await addRecipeToList(a, cups.id, 1);
+
+    const sugar = items.filter((i) => i.name === 'sugar');
+    expect(sugar).toHaveLength(1);
+    expect(sugar[0]).toMatchObject({ quantity: 953.592, unit: 'g' });
+  });
+
+  it('never merges volume with weight, or a count with a measure', async () => {
+    const a = await createHousehold();
+    const { id } = await createRecipe(a, {
+      title: 'Mixed',
+      servings: 1,
+      ingredientLines: ['1 cup flour', '100 g flour', '2 sticks butter', '2 tbsp butter'],
+    });
+
+    const { items } = await addRecipeToList(a, id, 1);
+    expect(items.filter((i) => i.name === 'flour')).toHaveLength(2);
+    expect(items.filter((i) => i.name === 'butter')).toHaveLength(2);
+  });
+
   it('never merges "to taste" (null quantity) items', async () => {
     const a = await createHousehold();
     const { id } = await createRecipe(a, {
