@@ -944,11 +944,25 @@ describe('an ingredient line cut off before it ends', () => {
 
   it('joins a line cut off after an article', () => {
     expect(list('1 tablespoon juice from a\nlemon')).toEqual(['1 tablespoon juice from a lemon']);
+    expect(list('1 teaspoon zest from the\nlime')).toEqual(['1 teaspoon zest from the lime']);
   });
 
-  it('joins a line cut off after a participle that is still naming the food', () => {
-    expect(list('¼ cup oil-packed marinated\nartichokes, drained')).toEqual([
-      '¼ cup oil-packed marinated artichokes, drained',
+  it('joins a line whose amount is followed only by participles and sizes', () => {
+    expect(list('1 jar roasted\npeppers, drained\n1 cup ground\nbeef')).toEqual([
+      '1 jar roasted peppers, drained',
+      '1 cup ground beef',
+    ]);
+  });
+
+  it('does not join a staple under a line that ends on a participle after its food', () => {
+    // A paste writes "2 eggs beaten" as often as "2 eggs, beaten"; the line is complete either way.
+    expect(list('2 eggs beaten\nsalt and pepper')).toEqual(['2 eggs beaten', 'salt and pepper']);
+    expect(list('1 onion diced\nsalt')).toEqual(['1 onion diced', 'salt']);
+    expect(list('1 cup flour sifted\nkosher salt')).toEqual(['1 cup flour sifted', 'kosher salt']);
+    // The cost: shape cannot tell "Greek" from a food, so this wrap stays two lines.
+    expect(list('¼ cup Greek marinated\nartichokes, drained')).toEqual([
+      '¼ cup Greek marinated',
+      'artichokes, drained',
     ]);
   });
 

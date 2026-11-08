@@ -825,14 +825,17 @@ const FOODLESS_WORDS = new Set([
  * the rest of it: the weaker sibling of `continuesOnNextLine`, used only when the next line also
  * leads with no amount (`leadsWithNoAmount`).
  *
- * Four ends count:
- *  - an article: "1 tablespoon juice from a" / "lemon";
+ * Three ends count:
+ *  - an article: "1 tablespoon juice of the" / "lemon";
  *  - a prep adverb that is not finishing a participle: "drained and thinly" / "sliced", but not
  *    "sliced thinly", which is a whole phrase;
- *  - a participle on a line with no comma in it, which is still in front of its food:
- *    "¼ cup marinated" / "artichokes". After a comma ("1 onion, chopped") or a joining word
- *    ("peeled and chopped") the participle is the end of the note, and the line is complete;
- *  - an amount with no food named yet: "2 large" / "eggs", "1 (15-ounce) can" / "chickpeas".
+ *  - an amount with no food named yet, sizes, forms, containers and participles aside:
+ *    "2 large" / "eggs", "1 (15-ounce) can" / "chickpeas", "1 jar roasted" / "peppers".
+ *
+ * A participle after a food is NOT an unfinished end, comma or no comma: a paste writes
+ * "2 eggs beaten" and "1 onion diced" as often as with the comma, and "salt and pepper" under
+ * them is an ingredient of its own. So "¼ cup Greek marinated" / "artichokes" is left as two
+ * lines: "Greek" could be the food as far as shape can tell.
  */
 function endsUnfinished(text: string): boolean {
   if (text.length > MAX_INGREDIENT_CHARS) return false;
@@ -842,7 +845,6 @@ function endsUnfinished(text: string): boolean {
   if (last === 'a' || last === 'an' || last === 'the') return true;
   const word = last.toLowerCase();
   if (PREP_ADVERBS.has(word)) return !isParticiple(before);
-  if (isParticiple(word) && !text.includes(',') && !/^(?:and|or|&)$/.test(before)) return true;
   return namesNoFood(text);
 }
 
@@ -948,11 +950,13 @@ function toIngredients(lines: Line[], block: Block, amounts: boolean[]): string[
  * more space above it than between its own lines ("1 (12-ounce) jar roasted" / "red peppers,
  * drained"), and a photo import turns that space into a blank line (`reading-order.ts`). Read
  * line by line, "red peppers, drained" is an ingredient of its own, and a jar of peppers is two
- * rows on the shopping list. The ordinary rule in `toIngredients` cannot join it: "roasted"
- * could end an ingredient as well as any word could.
+ * rows on the shopping list. The ordinary rule in `toIngredients` now joins this one too
+ * (`endsUnfinished`: "1 jar roasted" names no food yet), but not a wrap that falls after the
+ * food ("1 jar roasted peppers" / "packed in oil, drained"), which only the spacing can say is
+ * one ingredient.
  *
  * Only when the list itself says so, which is most of its amount lines having a blank above
- * them. A paste has no blank lines inside a list at all, and that rule stays as it was.
+ * them. A paste has no blank lines inside a list at all, and the ordinary rule alone reads it.
  */
 function blankSeparated(lines: Line[], block: Block, amounts: boolean[]): boolean {
   let counted = 0;
@@ -1076,28 +1080,8 @@ const TITLE_LABEL = /^recipe:? (?=\S)/i;
 
 /** The words a title leaves in lower case, unless one starts it. */
 const MINOR_WORDS = new Set([
-  'a',
-  'an',
-  'and',
-  'or',
-  'the',
-  'of',
-  'with',
-  'in',
-  'on',
-  'for',
-  'to',
-  'at',
-  'by',
-  'alla',
-  'al',
-  'di',
-  'e',
-  'con',
-  'de',
-  'la',
-  'le',
-  'y',
+  'a', 'an', 'and', 'or', 'the', 'of', 'with', 'in', 'on', 'for', 'to', 'at', 'by',
+  'alla', 'al', 'di', 'e', 'con', 'de', 'la', 'le', 'y',
 ]);
 
 /**
@@ -1117,10 +1101,7 @@ function tidyTitle(title: string): string {
     .map((word, i) =>
       i > 0 && MINOR_WORDS.has(word)
         ? word
-        : word.replace(
-            /(^|-)(\p{L})/gu,
-            (_m, dash: string, letter: string) => dash + letter.toUpperCase(),
-          ),
+        : word.replace(/(^|-)(\p{L})/gu, (_m, dash: string, letter: string) => dash + letter.toUpperCase()),
     )
     .join(' ');
 }
@@ -1178,8 +1159,7 @@ function timesIn(lines: Line[]): { prep: number | null; cook: number | null } {
  */
 function headnoteBefore(lines: Line[], titleAt: number, block: Block): string | null {
   const prose = paragraphsBefore(lines, titleAt, block).filter(
-    (paragraph) =>
-      isProse(paragraph) && !leadsWithAmount(paragraph.split(' ').slice(0, 6).join(' ')),
+    (paragraph) => isProse(paragraph) && !leadsWithAmount(paragraph.split(' ').slice(0, 6).join(' ')),
   );
   return prose.length === 1 ? prose[0]! : null;
 }
@@ -1216,11 +1196,7 @@ function tipsIn(lines: Line[], from: number): string[] {
   for (let i = from; i < lines.length; i++) {
     if (!TIP_LEAD.test(lines[i]!.text)) continue;
     const group = [lines[i]!];
-    for (
-      let j = i + 1;
-      j < lines.length && !lines[j]!.blankBefore && !isTrailer(lines[j]!.text);
-      j++
-    ) {
+    for (let j = i + 1; j < lines.length && !lines[j]!.blankBefore && !isTrailer(lines[j]!.text); j++) {
       group.push(lines[j]!);
     }
     tips.push(joinWrapped(group).replace(/^[\p{L}'’]{0,12} ?tips?:/iu, 'Tip:'));
