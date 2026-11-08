@@ -281,10 +281,13 @@ function withoutPrintChrome(text: string): string {
  * The second pattern only allows a colon, whitespace and one hedging word between the verb and
  * the number. A looser gap - anything non-numeric up to some length - reads "Serves well with 4
  * slices of bread" as four servings.
+ *
+ * Either may be a range, "4-6 servings" or "Serves 4 to 6", whose high end is kept (D53). Every
+ * run is bounded and the count must start a run of digits, so a long line stays linear.
  */
 const SERVINGS_PATTERNS = [
-  /\b(\d+)\s+(?:servings?|portions?)\b/i,
-  /\b(?:serves|makes|yields?)\b:?\s*(?:about\s+|around\s+|roughly\s+)?(\d+)/i,
+  /(?<![\w\-–])(\d{1,3})(?:\s{0,3}(?:[-–]|to)\s{0,3}(\d{1,3}))?\s{1,3}(?:servings?|portions?)\b/i,
+  /\b(?:serves|makes|yields?)\b:?\s{0,3}(?:about\s+|around\s+|roughly\s+)?(\d{1,3})(?:\s{0,3}(?:[-–]|to)\s{0,3}(\d{1,3}))?(?!\d)/i,
 ] as const;
 
 /**
@@ -327,12 +330,18 @@ function isHeading(text: string): boolean {
   return INGREDIENT_HEADING.test(text) || STEP_HEADING.test(text) || TRAILER_HEADING.test(text);
 }
 
-/** Whether a line states a yield. Used both to read it and to keep it out of the ingredients. */
-function servingsIn(text: string): number | null {
+/**
+ * The yield a line states, as its low end and the high end of a range (null for one number).
+ * Used both to read it and to keep it out of the ingredients.
+ */
+function servingsIn(text: string): { low: number; high: number | null } | null {
   for (const pattern of SERVINGS_PATTERNS) {
     const match = text.match(pattern);
     const value = match ? Number(match[1]) : NaN;
-    if (Number.isInteger(value) && value >= 1 && value <= MAX_SERVINGS) return value;
+    if (Number.isInteger(value) && value >= 1 && value <= MAX_SERVINGS) {
+      const high = match?.[2] === undefined ? NaN : Number(match[2]);
+      return { low: value, high: high > value && high <= MAX_SERVINGS ? high : null };
+    }
   }
   return null;
 }
@@ -914,11 +923,13 @@ export function draftFromText(text: string, source: DraftSource): RecipeDraft | 
     if (i >= block.start && i <= block.end && amounts[i]) continue;
     const text = lines[i]!.text;
     const next = lines[i + 1]?.text ?? '';
+    const stated = servingsIn(text);
     const servings =
-      servingsIn(text) ??
-      (SERVINGS_LABEL.test(text) && BARE_COUNT.test(next) ? Number(next) : null);
-    if (servings !== null && servings >= 1) {
-      draft.servings = field(servings, 'low', servingsIn(text) !== null ? text : `${text} ${next}`);
+      stated ??
+      (SERVINGS_LABEL.test(text) && BARE_COUNT.test(next) ? { low: Number(next), high: null } : null);
+    if (servings !== null && servings.low >= 1) {
+      draft.servings = field(servings.low, 'low', stated !== null ? text : `${text} ${next}`);
+      draft.servingsHigh = servings.high;
       break;
     }
   }
