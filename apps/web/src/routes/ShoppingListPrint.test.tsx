@@ -39,12 +39,16 @@ function item(overrides: Record<string, unknown>) {
   };
 }
 
-function showList(items: unknown[]) {
+function serve(items: unknown[]) {
   list.get!.useQuery!.mockReturnValue({
     data: { list: { id: 'l1', householdId: 'h1' }, items },
     isLoading: false,
     isError: false,
   });
+}
+
+function showList(items: unknown[]) {
+  serve(items);
   return render(
     <MemoryRouter>
       <ShoppingList />
@@ -140,6 +144,20 @@ describe('Print on the Shop tab', () => {
 
   it('offers no Print, and leaves printing to the screen, when nothing is left to buy', () => {
     showList([item({ id: 'c', name: 'butter', checked: true })]);
+    expect(screen.queryByRole('button', { name: 'Print' })).toBeNull();
+    expect(sheet()).toBeNull();
+    expect(document.body).not.toHaveAttribute('data-printing');
+  });
+
+  it('lets go of printing once the last item is ticked', () => {
+    const { rerender } = showList([item({ id: 'a', name: 'coffee' })]);
+    expect(document.body).toHaveAttribute('data-printing');
+    serve([item({ id: 'a', name: 'coffee', checked: true })]);
+    rerender(
+      <MemoryRouter>
+        <ShoppingList />
+      </MemoryRouter>,
+    );
     expect(screen.queryByRole('button', { name: 'Print' })).toBeNull();
     expect(sheet()).toBeNull();
     expect(document.body).not.toHaveAttribute('data-printing');
