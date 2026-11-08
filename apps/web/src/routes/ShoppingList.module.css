@@ -12,6 +12,29 @@
   line-height: 1.1;
 }
 
+/* The title, with Print on the right. */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* The recipe screen's Print pill (RecipeShare.module.css), on the page's own background. */
+.printButton {
+  flex: none;
+  height: 44px;
+  padding: 0 18px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-radius: var(--radius-pill);
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .progress {
   display: flex;
   flex-direction: column;

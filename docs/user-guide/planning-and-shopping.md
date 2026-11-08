@@ -67,6 +67,13 @@ yet.
 - **Remove N unused foods:** clears foods no recipe uses any more, such as ones left behind after
   editing recipes.
 
+### Printing the list
+
+**Print**, beside the title on the **Shop** tab, prints what is still to buy: the date, then each
+department in the list's order, with the amount and a box to tick with a pen on every line.
+Checked items are left off, since they are in the basket already. To keep the list as a file,
+choose **Save as PDF** in the print window. Print appears only when something is left to buy.
+
 ### At the store
 
 - **Tick an item** to check it off. It moves to the **Done** section at the bottom. Tick it again

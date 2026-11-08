@@ -19,6 +19,10 @@ vi.mock('../lib/trpc', () => ({
   },
 }));
 
+// The print sheet repeats every line, hidden on screen, beside the screen in <body>. These tests are
+// about the screen; ShoppingListPrint.test.tsx covers the sheet.
+vi.mock('./ShoppingListPrint', () => ({ ShoppingListPrint: () => null }));
+
 const useGetQuery = trpc.shoppingList.get.useQuery as unknown as Mock;
 const useAddItem = trpc.shoppingList.addItem.useMutation as unknown as Mock;
 const useToggleChecked = trpc.shoppingList.toggleChecked.useMutation as unknown as Mock;
