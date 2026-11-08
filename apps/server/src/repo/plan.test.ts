@@ -158,6 +158,22 @@ describe('plan repository: build shopping list', () => {
     expect((await getActiveList(a)).items.find((i) => i.name === 'rice')?.quantity).toBe(3);
   });
 
+  it('keeps a moved meal on the list and buys nothing again (drag between slots, #18)', async () => {
+    const a = await createHousehold();
+    const soup = await createRecipe(a, {
+      title: 'Soup',
+      servings: 1,
+      ingredientLines: ['1 cup rice'],
+    });
+    const e = await addEntry(a, { date: WED, meal: 'dinner', recipeId: soup.id, servings: 1 });
+    await buildListForWeek(a, '2026-09-20');
+
+    const moved = await updateEntry(a, e.id, { date: '2026-09-25', meal: 'lunch' });
+    expect(moved).toMatchObject({ date: '2026-09-25', meal: 'lunch', onList: true });
+    expect(await buildListForWeek(a, '2026-09-20')).toEqual({ added: 0 });
+    expect((await getActiveList(a)).items.find((i) => i.name === 'rice')?.quantity).toBe(1);
+  });
+
   it('leaves other weeks alone', async () => {
     const a = await createHousehold();
     const soup = await createRecipe(a, { title: 'Soup', ingredientLines: ['1 cup rice'] });

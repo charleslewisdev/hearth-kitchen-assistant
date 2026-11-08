@@ -1,4 +1,12 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type DragEvent,
+  type FormEvent,
+  type HTMLAttributes,
+  type ReactNode,
+} from 'react';
 import { Link } from 'react-router-dom';
 import { addDays, formatQuantityRange, PLAN_MEALS, weekDates, type PlanMeal } from '@hearth/shared';
 import { trpc } from '../lib/trpc';
@@ -6,6 +14,7 @@ import styles from './Plan.module.css';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
 import { formatDay, localToday } from '../lib/dates';
 import { CookLogForm } from './CookLog';
+import { useMediaQuery } from '../lib/useMediaQuery';
 
 // One entry as `plan.week` returns it (repo/plan.ts `PlanEntry`).
 type Entry = {
@@ -24,6 +33,13 @@ const MEAL_LABEL: Record<PlanMeal, string> = {
   lunch: 'Lunch',
   dinner: 'Dinner',
 };
+
+// Meals drag between slots only where the week is a grid and there is a mouse (D27, D60): the
+// desktop breakpoint of Plan.module.css. A phone keeps its day cards and the Move sheet, which is
+// also the keyboard's way to move a meal.
+const DRAG_QUERY = '(min-width: 900px) and (pointer: fine)';
+// The drag's payload, for browsers that start a drag only when it carries data.
+const DRAG_TYPE = 'application/x-hearth-plan-entry';
 
 // Kept exported from here as well, where the planner's tests and PlanThisRecipe find it.
 export { localToday };
@@ -53,7 +69,29 @@ export function Plan() {
     { date: anchor },
     { placeholderData: (previous) => previous },
   );
-  const update = trpc.plan.update.useMutation({ onSuccess: invalidate });
+  // A move or a servings change shows at once (a dropped meal must not jump back to where it
+  // was while the server answers), rolls back if the server refuses, and ends with a refetch.
+  // The cached week is the one on screen; a move never leaves it.
+  type WeekData = NonNullable<typeof week.data>;
+  const update = trpc.plan.update.useMutation({
+    onMutate: async ({ id, ...patch }) => {
+      await utils.plan.week.cancel();
+      const previous = utils.plan.week.getData({ date: anchor });
+      utils.plan.week.setData({ date: anchor }, (old: WeekData | undefined) =>
+        old
+          ? { ...old, entries: old.entries.map((e) => (e.id === id ? { ...e, ...patch } : e)) }
+          : old,
+      );
+      return { previous };
+    },
+    onError: (_err, _input, context) => {
+      if (context?.previous) utils.plan.week.setData({ date: anchor }, context.previous);
+    },
+    onSettled: invalidate,
+  });
+  const canDrag = useMediaQuery(DRAG_QUERY);
+  const [dragged, setDragged] = useState<Entry | null>(null);
+  const [dropOver, setDropOver] = useState<string | null>(null);
   const remove = trpc.plan.remove.useMutation({ onSuccess: invalidate });
   const build = trpc.plan.buildList.useMutation({
     onSuccess: (result) => {
@@ -102,6 +140,39 @@ export function Plan() {
     setAnchor(date);
     setBuilt(null);
   }
+
+  // A slot accepts a dragged meal: a planned meal's row, or an empty meal's pill. Dropping on a
+  // slot that already has meals adds this one beside them, as planning into it would (a slot
+  // holds any number); its own slot is a no-op. Only the date and meal change, so a meal already
+  // on the shopping list stays on it (D44).
+  function dropTarget(date: string, meal: PlanMeal): HTMLAttributes<HTMLElement> {
+    if (!canDrag || !dragged) return {};
+    const key = `${date} ${meal}`;
+    const accept = (e: DragEvent) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      setDropOver(key);
+    };
+    return {
+      onDragEnter: accept,
+      onDragOver: accept,
+      onDragLeave: (e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+          setDropOver((current) => (current === key ? null : current));
+        }
+      },
+      onDrop: (e) => {
+        e.preventDefault();
+        setDropOver(null);
+        setDragged(null);
+        if (dragged.date !== date || dragged.meal !== meal) {
+          update.mutate({ id: dragged.id, date, meal });
+        }
+      },
+    };
+  }
+  const dropClass = (date: string, meal: PlanMeal) =>
+    dropOver === `${date} ${meal}` ? ` ${styles.dropOver}` : '';
 
   return (
     <section className={styles.screen}>
@@ -172,7 +243,13 @@ export function Plan() {
               // own: an empty week was 21 "+ Add" rows (D49).
               if (inSlot.length === 0) return null;
               return (
-                <div key={meal} className={styles.slot}>
+                <div
+                  key={meal}
+                  className={`${styles.slot}${dropClass(date, meal)}`}
+                  role="group"
+                  aria-label={`${formatDay(date, { weekday: 'long' })} ${MEAL_LABEL[meal]}`}
+                  {...dropTarget(date, meal)}
+                >
                   <div className={styles.slotHead}>
                     <h3 className={styles.mealName}>{MEAL_LABEL[meal]}</h3>
                     <button
@@ -189,6 +266,18 @@ export function Plan() {
                       <EntryRow
                         key={entry.id}
                         entry={entry}
+                        {...(canDrag
+                          ? {
+                              drag: {
+                                dragging: dragged?.id === entry.id,
+                                onStart: () => setDragged(entry),
+                                onEnd: () => {
+                                  setDragged(null);
+                                  setDropOver(null);
+                                },
+                              },
+                            }
+                          : {})}
                         onServings={(servings) => update.mutate({ id: entry.id, servings })}
                         onMove={() => setMoving(entry)}
                         onRemove={() => remove.mutate({ id: entry.id })}
@@ -217,8 +306,9 @@ export function Plan() {
                   <button
                     key={meal}
                     type="button"
-                    className={styles.mealPill}
+                    className={`${styles.mealPill}${dropClass(date, meal)}`}
                     onClick={() => setPicking({ date, meal })}
+                    {...dropTarget(date, meal)}
                     aria-label={`Add to ${formatDay(date, { weekday: 'long' })} ${MEAL_LABEL[meal]}`}
                   >
                     + {MEAL_LABEL[meal]}
@@ -277,22 +367,47 @@ export function Plan() {
 
 function EntryRow({
   entry,
+  drag,
   onServings,
   onMove,
   onRemove,
   onCooked,
 }: {
   entry: Entry;
+  // Present on a desktop only: the row can be picked up and dropped on another slot.
+  drag?: { dragging: boolean; onStart: () => void; onEnd: () => void };
   onServings: (servings: number) => void;
   onMove: () => void;
   onRemove: () => void;
   onCooked?: () => void;
 }) {
   const title = entry.recipe.title;
+  const dragProps: HTMLAttributes<HTMLLIElement> & { draggable?: boolean } = drag
+    ? {
+        draggable: true,
+        title: 'Drag to another day or meal',
+        onDragStart: (e) => {
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData(DRAG_TYPE, entry.id);
+          drag.onStart();
+        },
+        onDragEnd: drag.onEnd,
+      }
+    : {};
   return (
-    <li className={styles.entry}>
+    <li
+      className={`${styles.entry}${drag ? ` ${styles.draggable}` : ''}${
+        drag?.dragging ? ` ${styles.dragging}` : ''
+      }`}
+      {...dragProps}
+    >
       <div className={styles.entryMain}>
-        <Link to={`/recipes/${entry.recipe.slug}`} className={styles.entryTitle}>
+        <Link
+          to={`/recipes/${entry.recipe.slug}`}
+          className={styles.entryTitle}
+          // The whole row is the thing dragged, not the link's address.
+          {...(drag ? { draggable: false } : {})}
+        >
           {title}
         </Link>
         {entry.onList && <span className={styles.onList}>On list</span>}

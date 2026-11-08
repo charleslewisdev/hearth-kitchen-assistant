@@ -187,6 +187,36 @@ describe('Plan', () => {
     );
   });
 
+  it('applies a move to the cached week at once and puts it back if the server refuses', async () => {
+    const cached = { start: START, weekStart: 0, entries: [entry()] };
+    let data: unknown = cached;
+    const week = {
+      invalidate: vi.fn(),
+      cancel: vi.fn(),
+      getData: vi.fn(() => data),
+      setData: vi.fn((_input: unknown, next: unknown) => {
+        data = typeof next === 'function' ? (next as (old: unknown) => unknown)(data) : next;
+      }),
+    };
+    useUtils.mockReturnValue({ plan: { week }, shoppingList: { get: { invalidate: vi.fn() } } });
+    mockWeek([entry()]);
+    renderPlan();
+    const options = useUpdate.mock.lastCall![0];
+    const move = { id: 'e1', date: '2026-09-24', meal: 'lunch' };
+
+    const context = await options.onMutate(move);
+    expect(week.cancel).toHaveBeenCalled();
+    expect(week.getData).toHaveBeenCalledWith({ date: localToday() });
+    expect(data).toMatchObject({
+      entries: [{ id: 'e1', date: '2026-09-24', meal: 'lunch', servings: 4, onList: false }],
+    });
+
+    options.onError(new Error('refused'), move, context);
+    expect(data).toBe(cached);
+    options.onSettled();
+    expect(week.invalidate).toHaveBeenCalled();
+  });
+
   it('steps to the next week', () => {
     mockWeek([]);
     renderPlan();
@@ -232,5 +262,83 @@ describe('logging a planned meal as cooked', () => {
     expect(addLog).toHaveBeenCalledWith(
       expect.objectContaining({ recipeId: 'r1', cookedOn: '2026-09-22', servings: 3 }),
     );
+  });
+});
+
+describe('dragging a meal on a desktop', () => {
+  // A wide screen with a mouse is the only setting in which entries are draggable.
+  // Only this spy is restored afterwards: restoreAllMocks would also strip the implementation
+  // from test-setup's own matchMedia stub, and every later test would crash on it.
+  let media: { mockRestore: () => void } | undefined;
+  function desktop(matches: boolean) {
+    media = vi.spyOn(window, 'matchMedia').mockImplementation(
+      (query: string) =>
+        ({
+          matches,
+          media: query,
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+        }) as unknown as MediaQueryList,
+    );
+  }
+  afterEach(() => media?.mockRestore());
+
+  function drag(from: HTMLElement, to: HTMLElement) {
+    const dataTransfer = {
+      setData: vi.fn(),
+      getData: vi.fn(() => ''),
+      effectAllowed: '',
+      dropEffect: '',
+    };
+    fireEvent.dragStart(from, { dataTransfer });
+    fireEvent.dragEnter(to, { dataTransfer });
+    fireEvent.dragOver(to, { dataTransfer });
+    fireEvent.drop(to, { dataTransfer });
+    fireEvent.dragEnd(from, { dataTransfer });
+  }
+
+  const soup = () => screen.getByRole('link', { name: 'Tomato Soup' }).closest('li')!;
+
+  it('moves a meal onto an empty meal of another day', () => {
+    desktop(true);
+    mockWeek([entry()]);
+    renderPlan();
+    expect(soup()).toHaveAttribute('draggable', 'true');
+    drag(soup(), screen.getByRole('button', { name: 'Add to Thursday Lunch' }));
+    expect(updateMutate).toHaveBeenCalledWith({ id: 'e1', date: '2026-09-24', meal: 'lunch' });
+  });
+
+  it('adds a meal dropped on a planned slot alongside what is there', () => {
+    desktop(true);
+    mockWeek([
+      entry(),
+      entry({
+        id: 'e2',
+        date: '2026-09-23',
+        recipe: { id: 'r3', slug: 'pilaf', title: 'Pilaf', servings: 6 },
+      }),
+    ]);
+    renderPlan();
+    drag(soup(), screen.getByRole('group', { name: 'Wednesday Dinner' }));
+    expect(updateMutate).toHaveBeenCalledTimes(1);
+    expect(updateMutate).toHaveBeenCalledWith({ id: 'e1', date: '2026-09-23', meal: 'dinner' });
+  });
+
+  it('does nothing when a meal is dropped back on its own slot', () => {
+    desktop(true);
+    mockWeek([entry()]);
+    renderPlan();
+    drag(soup(), screen.getByRole('group', { name: 'Tuesday Dinner' }));
+    expect(updateMutate).not.toHaveBeenCalled();
+  });
+
+  it('does not make meals draggable on a phone, where Move does the job', () => {
+    desktop(false);
+    mockWeek([entry()]);
+    renderPlan();
+    expect(soup()).not.toHaveAttribute('draggable', 'true');
+    drag(soup(), screen.getByRole('button', { name: 'Add to Thursday Lunch' }));
+    expect(updateMutate).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Move' })).toBeInTheDocument();
   });
 });
