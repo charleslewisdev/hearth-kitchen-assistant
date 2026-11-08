@@ -13,6 +13,7 @@ function ocrDraft(): RecipeDraft {
   return {
     title: { value: 'Parsnip Soup', confidence: 'low', raw: 'PARSNIP SOUP' },
     servings: { value: 4, confidence: 'low', raw: 'Serves 4' },
+    servingsHigh: null,
     mealTypes: { value: [], confidence: 'low', raw: null },
     tags: { value: [], confidence: 'low', raw: null },
     ingredientLines: {
@@ -54,6 +55,7 @@ describe('keeping an import draft', () => {
       titleRaw: 'PARSNIP SOUP',
       savedAt: null,
       servings: 4,
+      servingsHigh: null,
       servingsRaw: 'Serves 4',
       description: 'A winter soup.',
       prepMinutes: 10,
@@ -74,6 +76,34 @@ describe('keeping an import draft', () => {
       .where(eq(importDraftStep.draftId, id))
       .orderBy(asc(importDraftStep.position));
     expect(steps.map((s) => s.text)).toEqual(['Peel the parsnips.', 'Simmer and blend.']);
+  });
+
+  it('keeps the high end of a servings range the parser read (D53)', async () => {
+    const household = await createHousehold();
+    const draft = ocrDraft();
+    draft.servings = { value: 4, confidence: 'low', raw: 'Serves 4 to 6' };
+    draft.servingsHigh = 6;
+    const id = await keepImportDraft(household, null, {
+      draft,
+      text: OCR_TEXT,
+      reading: 'photo_ocr',
+    });
+    expect(await draftRow(id)).toMatchObject({ servings: 4, servingsHigh: 6 });
+  });
+
+  it('keeps no high end that is not above the servings, rather than failing the CHECK', async () => {
+    const household = await createHousehold();
+    for (const servingsHigh of [6, 4]) {
+      const draft = ocrDraft();
+      draft.servings = { value: 6, confidence: 'low', raw: 'Serves 6' };
+      draft.servingsHigh = servingsHigh;
+      const id = await keepImportDraft(household, null, {
+        draft,
+        text: OCR_TEXT,
+        reading: 'photo_ocr',
+      });
+      expect(await draftRow(id)).toMatchObject({ servings: 6, servingsHigh: null });
+    }
   });
 
   it('keeps a draft with no ingredients or steps', async () => {

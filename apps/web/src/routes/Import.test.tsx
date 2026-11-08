@@ -248,6 +248,29 @@ describe('importing a file', () => {
     expect(mutate.fromImage).not.toHaveBeenCalled();
   });
 
+  it('sends a chosen Markdown file as the text it holds, the same path a paste takes', async () => {
+    renderImport();
+    const input = screen.getByLabelText(/markdown/i);
+    expect(input).toHaveAttribute('type', 'file');
+    expect(input).toHaveAttribute('accept', '.md,.markdown,text/markdown,text/plain');
+    const md = '---\ntitle: "Barley Pilaf"\n---\n## Ingredients\n- 1 cup barley\n';
+    fireEvent.change(input, { target: { files: [new File([md], 'barley-pilaf.md')] } });
+    await waitFor(() => expect(mutate.fromText).toHaveBeenCalledWith({ text: md }));
+  });
+
+  it('refuses a Markdown file longer than a paste may be, and an empty one', async () => {
+    renderImport();
+    fireEvent.change(screen.getByLabelText(/markdown/i), {
+      target: { files: [new File(['x'.repeat(100_001)], 'huge.md')] },
+    });
+    expect(await screen.findByRole('alert')).toHaveTextContent(/too long to import/i);
+    fireEvent.change(screen.getByLabelText(/markdown/i), {
+      target: { files: [new File(['  \n'], 'empty.md')] },
+    });
+    expect(await screen.findByRole('alert')).toHaveTextContent(/nothing in that file/i);
+    expect(mutate.fromText).not.toHaveBeenCalled();
+  });
+
   it('does nothing at all when the picker is dismissed', async () => {
     renderImport();
     fireEvent.change(screen.getByLabelText(/pdf/i), { target: { files: [] } });

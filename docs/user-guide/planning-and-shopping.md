@@ -10,7 +10,8 @@ The household has one shopping list, on the **Shop** tab. Everyone in the househ
 2. Set **Servings** to the number you are cooking for.
 3. Press **Add to list** at the bottom of the recipe. Hearth says "Added to your shopping list."
 
-Hearth adds each ingredient at the scaled amount. Water is never added: it is in the recipe, not
+Hearth adds each ingredient at the scaled amount, and the high end of a range: "2–3 cloves"
+goes on the list as 3. Water is never added: it is in the recipe, not
 in the shop. The list rounds amounts up, so you always buy enough:
 
 - Counted items (cloves, stalks, cans, or a bare "3 eggs") show as whole numbers: 16⅙ cloves of

@@ -5,6 +5,7 @@ import {
   itemMergeKey,
   isNeverBought,
   parseIngredientLine,
+  quantityToBuy,
   type ScalingMode,
 } from '@hearth/shared';
 import type { ListAmount } from '@hearth/shared';
@@ -144,7 +145,8 @@ interface Candidate {
 }
 
 // Add a recipe's ingredients to the active list, scaled from the recipe's own
-// serving count to `servings`, aggregating where possible.
+// serving count to `servings`, aggregating where possible. A range buys its high end
+// (`quantityToBuy`, D53), and from there it aggregates like any single amount.
 //
 // Aggregation (design decision 3, via `itemMergeKey`): a candidate merges into an
 // existing RECIPE item on the same list when they share a non-null food, the same
@@ -199,6 +201,7 @@ async function recipeCandidates(
     .select({
       foodId: recipeIngredient.foodId,
       quantity: recipeIngredient.quantity,
+      quantityHigh: recipeIngredient.quantityHigh,
       unit: recipeIngredient.unit,
       note: recipeIngredient.note,
       rawText: recipeIngredient.rawText,
@@ -216,7 +219,11 @@ async function recipeCandidates(
   const servingsChange = { from: recipeRow.servings, to: servingsFor(recipeRow.servings) };
   const candidates: Candidate[] = [];
   for (const ing of ingredients) {
-    const quantity = ing.quantity == null ? null : Number(ing.quantity);
+    // The high end of a range ("2-3 cloves" buys 3), so the list never runs short (D53).
+    const quantity = quantityToBuy(
+      ing.quantity == null ? null : Number(ing.quantity),
+      ing.quantityHigh == null ? null : Number(ing.quantityHigh),
+    );
     const mode = ing.scalingMode as ScalingMode;
 
     const linked = ing.linkedRecipeId;
@@ -370,6 +377,8 @@ async function addToAmount(
 export async function addManualItem(householdId: string, text: string): Promise<ShoppingItem> {
   return withHousehold(householdId, async (tx) => {
     const parsed = parseIngredientLine(text);
+    // "2-3 limes" typed onto the list is 3, as a recipe's range would be (D53).
+    const toBuy = quantityToBuy(parsed.quantity, parsed.quantityHigh ?? null);
     const foodRow =
       parsed.foodName === '' ? null : await findOrCreateFood(tx, householdId, parsed.foodName);
 
@@ -383,7 +392,7 @@ export async function addManualItem(householdId: string, text: string): Promise<
         listId: list.id,
         foodId: foodRow?.id ?? null,
         name: parsed.foodName || text,
-        quantity: parsed.quantity == null ? null : String(parsed.quantity),
+        quantity: toBuy == null ? null : String(toBuy),
         unit: parsed.unit,
         note: parsed.note,
         department: foodRow?.department ?? null,

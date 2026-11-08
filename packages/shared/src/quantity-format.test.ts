@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatQuantity } from './quantity-format';
+import { formatQuantity, formatQuantityRange } from './quantity-format';
 import { scale } from './scale';
 
 describe('formatQuantity', () => {
@@ -39,5 +39,24 @@ describe('formatQuantity', () => {
     expect(formatQuantity(0.5, 'g')).toBe('0.5');
     expect(formatQuantity(187.5, 'g')).toBe('187.5');
     expect(formatQuantity(1.25, 'l')).toBe('1.25');
+  });
+});
+
+describe('formatQuantityRange', () => {
+  it('shows both ends with an en dash', () => {
+    expect(formatQuantityRange(2, 3)).toBe('2–3');
+    expect(formatQuantityRange(0.5, 1, 'cup')).toBe('½–1');
+    expect(formatQuantityRange(1.5, 2, 'cup')).toBe('1 ½–2');
+    expect(formatQuantityRange(250, 300.5, 'g')).toBe('250–300.5');
+  });
+  it('shows a single amount when there is no high end', () => {
+    expect(formatQuantityRange(4, null)).toBe('4');
+    expect(formatQuantityRange(0.25, undefined, 'tsp')).toBe('¼');
+  });
+  it('shows one amount when both ends round to the same thing', () => {
+    expect(formatQuantityRange(0.333, 0.34, 'cup')).toBe('⅓');
+  });
+  it('formats a servings range', () => {
+    expect(formatQuantityRange(4, 6)).toBe('4–6');
   });
 });

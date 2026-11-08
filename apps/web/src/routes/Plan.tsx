@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { addDays, PLAN_MEALS, weekDates, type PlanMeal } from '@hearth/shared';
+import { addDays, formatQuantityRange, PLAN_MEALS, weekDates, type PlanMeal } from '@hearth/shared';
 import { trpc } from '../lib/trpc';
 import styles from './Plan.module.css';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
@@ -457,7 +457,9 @@ function RecipePicker({
               }}
             >
               <span>{card.title}</span>
-              <span className={styles.resultMeta}>serves {card.servings}</span>
+              <span className={styles.resultMeta}>
+                serves {formatQuantityRange(card.servings, card.servingsHigh)}
+              </span>
             </button>
           </li>
         ))}

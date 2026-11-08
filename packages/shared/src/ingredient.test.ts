@@ -35,35 +35,67 @@ describe('parseIngredientLine', () => {
   it('parses a decimal quantity', () => {
     expect(parseIngredientLine('1.5 lb ground beef')).toEqual({ quantity: 1.5, unit: 'lb', foodName: 'ground beef', note: null });
   });
-  it('collapses a range to its low end', () => {
-    expect(parseIngredientLine('2-3 cloves garlic')).toEqual({ quantity: 2, unit: 'clove', foodName: 'garlic', note: null });
+  it('keeps both ends of a range', () => {
+    expect(parseIngredientLine('2-3 cloves garlic')).toEqual({
+      quantity: 2,
+      quantityHigh: 3,
+      unit: 'clove',
+      foodName: 'garlic',
+      note: null,
+    });
   });
-  it('collapses a range written with a word to its low end, keeping the unit and the food', () => {
+  it('keeps both ends of a range written with a word, and the unit and the food', () => {
     expect(parseIngredientLine('4 to 5 tablespoons olive oil, plus more for drizzling')).toEqual({
       quantity: 4,
+      quantityHigh: 5,
       unit: 'tbsp',
       foodName: 'olive oil',
       note: 'plus more for drizzling',
     });
     expect(parseIngredientLine('2 or 3 bay leaves')).toMatchObject({
       quantity: 2,
+      quantityHigh: 3,
       foodName: 'bay leaves',
     });
     expect(parseIngredientLine('¾ to 1 cup onions')).toMatchObject({
       quantity: 0.75,
+      quantityHigh: 1,
       unit: 'cup',
       foodName: 'onions',
     });
     expect(parseIngredientLine('1 1/2 to 2 cups stock')).toMatchObject({
       quantity: 1.5,
+      quantityHigh: 2,
       unit: 'cup',
       foodName: 'stock',
     });
     expect(parseIngredientLine('1/4-1/2 tsp cayenne')).toMatchObject({
       quantity: 0.25,
+      quantityHigh: 0.5,
       unit: 'tsp',
       foodName: 'cayenne',
     });
+  });
+  it('keeps a range behind a hedge and beside a second measure', () => {
+    expect(parseIngredientLine('about 2-3 cups flour')).toMatchObject({
+      quantity: 2,
+      quantityHigh: 3,
+      unit: 'cup',
+      note: 'about',
+    });
+    expect(parseIngredientLine('2–3 cups (240g) flour')).toMatchObject({
+      quantity: 2,
+      quantityHigh: 3,
+      altQuantity: 240,
+      altUnit: 'g',
+    });
+  });
+  it('has no high end for a single amount, or for a range of lengths that is one piece', () => {
+    expect(parseIngredientLine('2 cups flour')).not.toHaveProperty('quantityHigh');
+    expect(parseIngredientLine('3-2 eggs')).not.toHaveProperty('quantityHigh');
+    const piece = parseIngredientLine('2-3 inch piece ginger');
+    expect(piece).toMatchObject({ quantity: 1, unit: 'piece' });
+    expect(piece).not.toHaveProperty('quantityHigh');
   });
   it('does not read a food that starts with "or" as a range', () => {
     expect(parseIngredientLine('2 oranges')).toMatchObject({ quantity: 2, foodName: 'oranges' });

@@ -129,3 +129,41 @@ describe('a recipe as text to send', () => {
     expect(text).not.toContain('Source');
   });
 });
+
+describe('a recipe with ranges as text to send (D53)', () => {
+  const CHILI: ShareableRecipe = {
+    ...SOUP,
+    title: 'Chili',
+    servings: 4,
+    servingsHigh: 6,
+    description: null,
+    sourceName: null,
+    sourceUrl: null,
+    ingredients: [line({ quantity: 2, quantityHigh: 3, unit: 'clove', foodName: 'garlic' })],
+    steps: [],
+  };
+
+  it('shows both ends at the recipe’s own servings', () => {
+    expect(recipeText(CHILI, { servings: 4, system: 'us' })).toBe(
+      [
+        'Chili',
+        'Serves 4–6 · Prep 10 min · Cook 30 min',
+        '',
+        'Ingredients',
+        '- 2–3 cloves garlic',
+      ].join('\n'),
+    );
+  });
+
+  it('scales both ends from the low end once the cook has scaled it', () => {
+    expect(recipeText(CHILI, { servings: 8, system: 'us' })).toBe(
+      [
+        'Chili',
+        'Serves 8 · Prep 10 min · Cook 30 min',
+        '',
+        'Ingredients',
+        '- 4–6 cloves garlic',
+      ].join('\n'),
+    );
+  });
+});
