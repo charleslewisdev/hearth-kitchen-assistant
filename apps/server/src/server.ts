@@ -1,4 +1,5 @@
 import { backfillAltMeasures } from './repo/alt-measures';
+import { backfillQuantityRanges } from './repo/quantity-ranges';
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { join, sep } from 'node:path';
@@ -566,6 +567,8 @@ if (env.NODE_ENV !== 'test' && process.argv[1]?.endsWith('server.ts')) {
       await announceSetupToken(app.log);
       const filled = await backfillAltMeasures();
       if (filled > 0) app.log.info({ count: filled }, 'ingredient second measures filled in');
+      const ranged = await backfillQuantityRanges();
+      if (ranged > 0) app.log.info({ count: ranged }, 'ingredient quantity ranges filled in');
       await app.listen({ port: env.PORT, host: '0.0.0.0' });
     })
     .catch((err: unknown) => {

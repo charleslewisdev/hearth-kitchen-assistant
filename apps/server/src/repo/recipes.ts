@@ -40,6 +40,8 @@ export interface AssembledIngredient {
   id: string;
   position: number;
   quantity: number | null;
+  /** The high end when the amount is a range ("2-3 cloves"), else null (D53). */
+  quantityHigh: number | null;
   unit: string | null;
   /** The same amount in the other system, when the recipe prints one ("3 cups (360g)"). */
   altQuantity: number | null;
@@ -66,6 +68,8 @@ export interface AssembledRecipe {
   slug: string;
   description: string | null;
   servings: number;
+  /** The high end when the recipe serves a range ("Serves 4-6"), else null (D53). */
+  servingsHigh: number | null;
   prepMinutes: number | null;
   cookMinutes: number | null;
   sourceUrl: string | null;
@@ -90,6 +94,7 @@ export interface RecipeCard {
   slug: string;
   description: string | null;
   servings: number;
+  servingsHigh: number | null;
   mealTypes: MealType[];
   prepMinutes: number | null;
   cookMinutes: number | null;
@@ -105,6 +110,13 @@ export interface RecipeCard {
 export interface CreateRecipeInput {
   title: string;
   servings?: number;
+  /**
+   * The high end when the recipe serves a range, with `servings` the low end (D53). Null, or a
+   * value not above `servings`, means one number. On update `undefined` keeps the stored high end
+   * while it is still above the new `servings`, so a caller that does not know the field cannot
+   * erase it, and drops it otherwise.
+   */
+  servingsHigh?: number | null;
   mealTypes?: MealType[];
   tags?: string[];
   ingredientLines?: string[];
@@ -151,6 +163,11 @@ function optionalDetails(input: CreateRecipeInput) {
   if (input.prepMinutes !== undefined) details.prepMinutes = input.prepMinutes;
   if (input.cookMinutes !== undefined) details.cookMinutes = input.cookMinutes;
   return details;
+}
+
+/** A servings high end worth storing: above the low end, or none (the CHECK in migration 0016). */
+function servingsHighOrNull(servings: number, high: number | null | undefined): number | null {
+  return high != null && high > servings ? high : null;
 }
 
 // Find the canonical `tag` row for a household by normalized name, creating it if
@@ -317,6 +334,7 @@ async function insertRecipeChildren(
       foodId: food?.id ?? null,
       position,
       quantity: parsed.quantity == null ? null : String(parsed.quantity),
+      quantityHigh: parsed.quantityHigh === undefined ? null : String(parsed.quantityHigh),
       unit: parsed.unit,
       altQuantity: parsed.altQuantity === undefined ? null : String(parsed.altQuantity),
       altUnit: parsed.altUnit ?? null,
@@ -370,6 +388,7 @@ export async function createRecipe(
         title,
         slug,
         servings,
+        servingsHigh: servingsHighOrNull(servings, input.servingsHigh),
         mealTypes,
         ...optionalDetails(input),
       })
@@ -412,7 +431,17 @@ export async function updateRecipe(
     // Update scalar fields; keep slug stable, bump updatedAt.
     await tx
       .update(recipe)
-      .set({ title, servings, mealTypes, ...optionalDetails(input), updatedAt: new Date() })
+      .set({
+        title,
+        servings,
+        servingsHigh:
+          input.servingsHigh === undefined
+            ? sql`case when ${recipe.servingsHigh} > ${servings} then ${recipe.servingsHigh} end`
+            : servingsHighOrNull(servings, input.servingsHigh),
+        mealTypes,
+        ...optionalDetails(input),
+        updatedAt: new Date(),
+      })
       .where(and(eq(recipe.householdId, householdId), eq(recipe.id, id)));
 
     // Replace children: clear existing rows, then re-insert from input.
@@ -587,6 +616,7 @@ export async function searchRecipes(
         slug: recipe.slug,
         description: recipe.description,
         servings: recipe.servings,
+        servingsHigh: recipe.servingsHigh,
         mealTypes: recipe.mealTypes,
         prepMinutes: recipe.prepMinutes,
         cookMinutes: recipe.cookMinutes,
@@ -698,6 +728,7 @@ export async function getRecipe(
         id: recipeIngredient.id,
         position: recipeIngredient.position,
         quantity: recipeIngredient.quantity,
+        quantityHigh: recipeIngredient.quantityHigh,
         unit: recipeIngredient.unit,
         altQuantity: recipeIngredient.altQuantity,
         altUnit: recipeIngredient.altUnit,
@@ -752,6 +783,7 @@ export async function getRecipe(
       slug: row.slug,
       description: row.description,
       servings: row.servings,
+      servingsHigh: row.servingsHigh,
       prepMinutes: row.prepMinutes,
       cookMinutes: row.cookMinutes,
       sourceUrl: row.sourceUrl,
@@ -762,6 +794,7 @@ export async function getRecipe(
         position: i.position,
         // `numeric` comes back as a string (or null); coerce to number for the client.
         quantity: i.quantity == null ? null : Number(i.quantity),
+        quantityHigh: i.quantityHigh == null ? null : Number(i.quantityHigh),
         unit: i.unit,
         altQuantity: i.altQuantity == null ? null : Number(i.altQuantity),
         altUnit: i.altUnit,

@@ -55,6 +55,9 @@ export const recipe = pgTable(
     slug: text('slug').notNull(),
     description: text('description'),
     servings: integer('servings').notNull().default(1),
+    // The high end when the recipe serves a range ("Serves 4-6"); `servings` is the low end and
+    // the base the scaler scales from (D53).
+    servingsHigh: integer('servings_high'),
     prepMinutes: integer('prep_minutes'),
     cookMinutes: integer('cook_minutes'),
     sourceUrl: text('source_url'),
@@ -74,6 +77,10 @@ export const recipe = pgTable(
   },
   (t) => ({
     ratingRange: check('recipe_rating_range', sql`${t.rating} between 1 and 5`),
+    servingsHighAbove: check(
+      'recipe_servings_high_above_servings',
+      sql`${t.servingsHigh} is null or ${t.servingsHigh} > ${t.servings}`,
+    ),
   }),
 );
 
@@ -150,6 +157,9 @@ export const recipeIngredient = pgTable(
     foodId: uuid('food_id').references(() => food.id, { onDelete: 'restrict' }),
     position: integer('position').notNull(),
     quantity: numeric('quantity'),
+    // The high end when the amount is a range: the 3 of "2-3 cloves garlic", with `quantity` the
+    // 2 (D53). Null for a single amount, and never set without a low end.
+    quantityHigh: numeric('quantity_high'),
     unit: text('unit'),
     // The same amount in the other system when the recipe prints one: the 360 g of "3 cups
     // (360g) flour" (`measure-system.ts`). The cook picks which system to read in.
@@ -166,6 +176,10 @@ export const recipeIngredient = pgTable(
   (t) => ({
     // For the SET NULL when a linked recipe is deleted, and for "Used in" on the linked recipe.
     byLinkedRecipe: index('recipe_ingredient_linked_recipe_idx').on(t.linkedRecipeId),
+    quantityHighAbove: check(
+      'recipe_ingredient_quantity_high_above_quantity',
+      sql`${t.quantityHigh} is null or (${t.quantity} is not null and ${t.quantityHigh} > ${t.quantity})`,
+    ),
   }),
 );
 
@@ -308,6 +322,8 @@ export const importDraft = pgTable(
     // The line the title was taken from, before it was tidied and title-cased.
     titleRaw: text('title_raw'),
     servings: integer('servings').notNull(),
+    // The high end of a servings range the parser read ("Serves 4-6"), as on `recipe`.
+    servingsHigh: integer('servings_high'),
     servingsConfidence: draftConfidence('servings_confidence').notNull(),
     servingsRaw: text('servings_raw'),
     ingredientsConfidence: draftConfidence('ingredients_confidence').notNull(),
@@ -323,6 +339,10 @@ export const importDraft = pgTable(
   (t) => ({
     byHousehold: index('import_draft_household_idx').on(t.householdId, t.createdAt),
     byRecipe: index('import_draft_recipe_idx').on(t.recipeId),
+    servingsHighAbove: check(
+      'import_draft_servings_high_above_servings',
+      sql`${t.servingsHigh} is null or ${t.servingsHigh} > ${t.servings}`,
+    ),
   }),
 );
 
