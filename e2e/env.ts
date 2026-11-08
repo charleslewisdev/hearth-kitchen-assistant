@@ -45,6 +45,17 @@ loadDotenv(resolve(repoRoot, '.env'));
 export const WEB_ORIGIN = process.env.WEB_ORIGIN ?? 'http://localhost:5173';
 
 /**
+ * A production build of the web app, served by `vite preview`, for the offline specs.
+ *
+ * The service worker that makes a cold start offline possible exists only in a build: the dev
+ * server has none, so on :5173 a reload with no network is the browser's own error page. The
+ * preview proxies /api and /trpc to the API exactly as the dev server does (`preview.proxy`
+ * defaults to `server.proxy`). Better Auth trusts only WEB_ORIGIN, so a spec signs in there; the
+ * session cookie is the browser's for `localhost` whatever the port, so it holds here too.
+ */
+export const PREVIEW_ORIGIN = process.env.PREVIEW_ORIGIN ?? 'http://localhost:4173';
+
+/**
  * The API origin. The fixtures talk to it directly; the browser never does.
  *
  * Built from `PORT` rather than read from a variable of its own, because `PORT` is what the

@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 // Importing this module is what loads the repo-root .env into process.env, which the webServer
 // children below inherit. See e2e/env.ts.
-import { API_URL, repoRoot, SERVER_LOG_RELATIVE, WEB_ORIGIN } from './env';
+import { API_URL, PREVIEW_ORIGIN, repoRoot, SERVER_LOG_RELATIVE, WEB_ORIGIN } from './env';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -26,9 +26,10 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  // Start BOTH the API (Fastify/tRPC + Better Auth) and the web dev server. The Vite
-  // dev server proxies /api + /trpc to the API, so the browser only ever hits the web
-  // origin (baseURL). Playwright waits for both to be reachable before running tests.
+  // Start the API (Fastify/tRPC + Better Auth), the web dev server, and a production preview of
+  // the web app for the offline specs. Both web servers proxy /api + /trpc to the API, so the
+  // browser only ever hits a web origin (baseURL, or PREVIEW_ORIGIN). Playwright waits for all
+  // three to be reachable before running tests.
   webServer: [
     {
       /*
@@ -57,6 +58,20 @@ export default defineConfig({
       url: WEB_ORIGIN,
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
+    {
+      /*
+        A production build, for the offline specs: only a build has the service worker. Built
+        without the web package's `tsc` step, which `pnpm typecheck` already covers. A REUSED
+        preview serves whatever it was built from, so stop a stale one before a run.
+      */
+      command: `pnpm --filter @hearth/web exec vite build && pnpm --filter @hearth/web exec vite preview --port ${new URL(PREVIEW_ORIGIN).port} --strictPort`,
+      cwd: repoRoot,
+      url: PREVIEW_ORIGIN,
+      reuseExistingServer: !process.env.CI,
+      timeout: 180_000,
       stdout: 'pipe',
       stderr: 'pipe',
     },
