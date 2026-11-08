@@ -87,4 +87,12 @@ describe('draftFromMarkdown', () => {
     ).toBeNull();
     expect(draftFromMarkdown('---\nservings: 4\nservings_high: 4\n---\n')!.servingsHigh).toBeNull();
   });
+
+  it('reads a hand-written range, but no Up to beside servings it had to guess', () => {
+    const draft = draftFromMarkdown('---\nservings: 4\nservings_high: 6\n---\n')!;
+    expect([draft.servings.value, draft.servingsHigh]).toEqual([4, 6]);
+    const guessed = draftFromMarkdown('---\ntitle: Egg\nservings_high: 6\n---\n')!;
+    expect(guessed.servings).toEqual({ value: 1, confidence: 'low', raw: null });
+    expect(guessed.servingsHigh).toBeNull();
+  });
 });

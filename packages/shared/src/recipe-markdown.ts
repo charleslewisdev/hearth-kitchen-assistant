@@ -5,9 +5,9 @@ import { slugify } from './slug';
  * A recipe as a Markdown file, for export and for importing it back (D52).
  *
  * Front matter carries the fields a person would not want to hunt for in prose (title, servings
- * and the high end of a servings range, times, types, tags, rating, source), and the body carries the recipe as anyone would write it:
- * `## Ingredients` as a list, `## Method` as a numbered list, `## Notes` as text. Human-readable
- * first, and deterministic: `parseRecipeMarkdown(recipeToMarkdown(r))` is `r` again.
+ * and the high end of a servings range, times, types, tags, rating, source), and the body
+ * carries the recipe as anyone would write it: `## Ingredients` as a list, `## Method` as a
+ * numbered list, `## Notes` as text. Human-readable first, and deterministic: `parseRecipeMarkdown(recipeToMarkdown(r))` is `r` again.
  *
  * Every front-matter value is written as JSON (a quoted string, an integer, or a flow list of
  * strings), which is valid YAML too, so any YAML tool reads the file and this module needs no
