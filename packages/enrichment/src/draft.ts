@@ -54,12 +54,29 @@ export type DraftSource =
   | { kind: 'url'; url: string }
   | { kind: 'text' }
   | { kind: 'pdf' }
-  | { kind: 'image' };
+  | { kind: 'image' }
+  /**
+   * A recipe exported from Hearth as Markdown, or written in its format (`from-markdown.ts`).
+   * The file is the recipe's own record rather than somewhere it was found, so it carries the
+   * provenance and verdict the recipe already had: where it came from and the household's rating.
+   */
+  | {
+      kind: 'markdown';
+      sourceName: string | null;
+      sourceUrl: string | null;
+      rating: number | null;
+    };
 
 /** The fields `recipe.create` takes, each wrapped with its confidence and the source's words. */
 export interface RecipeDraft {
   title: DraftField<string>;
   servings: DraftField<number>;
+  /**
+   * The high end when the source gives the yield as a range ("Serves 4-6", "4-6 servings"):
+   * `servings` holds the low end, and this the high one, always above it (D53). It shares the
+   * servings field's confidence and source words; null when the yield is one number.
+   */
+  servingsHigh: number | null;
   mealTypes: DraftField<MealType[]>;
   tags: DraftField<string[]>;
   ingredientLines: DraftField<string[]>;
@@ -89,6 +106,8 @@ export interface RecipeDetails {
 export interface RecipeCreateInput {
   title: string;
   servings: number;
+  /** The high end of a servings range; absent when the yield is one number. */
+  servingsHigh?: number;
   mealTypes: MealType[];
   tags: string[];
   ingredientLines: string[];
@@ -101,6 +120,10 @@ export interface RecipeCreateInput {
    * headnote, the comments or the photograph, none of which the structured core keeps.
    */
   sourceUrl?: string;
+  /** Where it came from in words ("Aunt Wren's card box"); only a Markdown file states one. */
+  sourceName?: string;
+  /** The household's rating, 1 to 5; only a Markdown file carries one. */
+  rating?: number;
   description?: string;
   prepMinutes?: number;
   cookMinutes?: number;
@@ -122,6 +145,7 @@ export function emptyDraft(source: DraftSource): RecipeDraft {
   return {
     title: field('', 'low', null),
     servings: field(1, 'low', null),
+    servingsHigh: null,
     mealTypes: field<MealType[]>([], 'low', null),
     tags: field<string[]>([], 'low', null),
     ingredientLines: field<string[]>([], 'low', null),
@@ -132,23 +156,37 @@ export function emptyDraft(source: DraftSource): RecipeDraft {
   };
 }
 
+/** What a Markdown file says about the recipe's own provenance and rating (D52). */
+function markdownProvenance(
+  source: Extract<DraftSource, { kind: 'markdown' }>,
+): Pick<RecipeCreateInput, 'sourceUrl' | 'sourceName' | 'rating'> {
+  return {
+    ...(source.sourceUrl !== null ? { sourceUrl: source.sourceUrl } : {}),
+    ...(source.sourceName !== null ? { sourceName: source.sourceName } : {}),
+    ...(source.rating !== null ? { rating: source.rating } : {}),
+  };
+}
+
 /**
  * Strip the draft down to what `recipe.create` accepts.
  *
- * The one part of `source` that survives is a URL, because that is the only kind of provenance
- * a cook can act on: a link goes back to the headnote and the comments, and a file name does
- * not go anywhere. The kind itself does not survive - it belongs to the review screen, and
- * a saved recipe is a saved recipe.
+ * The one part of a found source that survives is a URL, because that is the only kind of
+ * provenance a cook can act on: a link goes back to the headnote and the comments, and a file
+ * name does not go anywhere. A Markdown export is different: it is the recipe's own record, so
+ * its source name, link and rating all survive. The kind itself does not survive - it belongs
+ * to the review screen, and a saved recipe is a saved recipe.
  */
 export function draftToCreateInput(draft: RecipeDraft): RecipeCreateInput {
   return {
     title: draft.title.value,
     servings: draft.servings.value,
+    ...(draft.servingsHigh !== null ? { servingsHigh: draft.servingsHigh } : {}),
     mealTypes: draft.mealTypes.value,
     tags: draft.tags.value,
     ingredientLines: draft.ingredientLines.value,
     steps: draft.steps.value,
     ...(draft.source.kind === 'url' ? { sourceUrl: draft.source.url } : {}),
+    ...(draft.source.kind === 'markdown' ? markdownProvenance(draft.source) : {}),
     ...(draft.details.description !== null ? { description: draft.details.description } : {}),
     ...(draft.details.prepMinutes !== null ? { prepMinutes: draft.details.prepMinutes } : {}),
     ...(draft.details.cookMinutes !== null ? { cookMinutes: draft.details.cookMinutes } : {}),

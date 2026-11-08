@@ -254,6 +254,13 @@ describe('RecipeView', () => {
     expect(sheet).toHaveTextContent('Combine everything.');
   });
 
+  it('offers the recipe as a Markdown file to download', () => {
+    renderView();
+    const link = screen.getByRole('link', { name: 'Download as Markdown' });
+    expect(link).toHaveAttribute('href', '/api/export/recipes/r1');
+    expect(link).toHaveAttribute('download');
+  });
+
   it("starts cooking at the recipe's own servings when the scaler is untouched", () => {
     renderView();
     expect(screen.getByRole('link', { name: 'Start cooking' })).toHaveAttribute(
@@ -272,6 +279,45 @@ describe('RecipeView', () => {
       'href',
       '/recipes/white-bean-soup/cook?servings=6',
     );
+  });
+});
+
+describe('a recipe with ranges (D53)', () => {
+  const RANGED = {
+    ...RECIPE,
+    servingsHigh: 6,
+    ingredients: [
+      {
+        ...RECIPE.ingredients[0]!,
+        id: 'g',
+        quantity: 2,
+        quantityHigh: 3,
+        unit: 'clove',
+        rawText: '2-3 cloves garlic',
+        foodName: 'garlic',
+      },
+    ],
+  };
+
+  it('shows the servings range and both ends of an amount at its own servings', () => {
+    useGetQuery.mockReturnValue({ data: RANGED, isLoading: false, isError: false });
+    renderView();
+    expect(screen.getByLabelText('Servings')).toHaveTextContent('4–6');
+    const garlic = screen.getByText('garlic').closest('li') as HTMLElement;
+    expect(garlic.textContent).toContain('2–3 cloves');
+  });
+
+  it('scales from the low end, both ends at once, and sends the number picked to the list', async () => {
+    useGetQuery.mockReturnValue({ data: RANGED, isLoading: false, isError: false });
+    renderView();
+    for (let i = 0; i < 4; i++) {
+      fireEvent.click(screen.getByRole('button', { name: 'Increase servings' }));
+    }
+    expect(screen.getByLabelText('Servings')).toHaveTextContent(/^8$/);
+    const garlic = screen.getByText('garlic').closest('li') as HTMLElement;
+    expect(garlic.textContent).toContain('4–6 cloves');
+    fireEvent.click(screen.getByRole('button', { name: 'Add to list' }));
+    expect(mutateAsync).toHaveBeenCalledWith({ recipeId: 'r1', servings: 8 });
   });
 });
 

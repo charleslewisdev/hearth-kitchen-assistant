@@ -12,6 +12,7 @@ import { trpc } from '../lib/trpc';
 import { amountText, hasSecondMeasure, useMeasureSystem } from '../lib/measure-system';
 import styles from './CookMode.module.css';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
+import { servingsText } from '../lib/servings';
 
 /**
  * Keep the screen on while cook mode is open.
@@ -127,6 +128,7 @@ interface PeekIngredient {
   id: string;
   position: number;
   quantity: number | null;
+  quantityHigh: number | null;
   unit: string | null;
   altQuantity: number | null;
   altUnit: string | null;
@@ -151,11 +153,14 @@ interface PeekIngredient {
 function IngredientPeek({
   ingredients,
   baseServings,
+  baseServingsHigh,
   servings,
   onClose,
 }: {
   ingredients: PeekIngredient[];
   baseServings: number;
+  /** The high end when the recipe serves a range, shown while it is not scaled (D53). */
+  baseServingsHigh: number | null;
   servings: number;
   onClose: () => void;
 }) {
@@ -179,7 +184,11 @@ function IngredientPeek({
     <div className={styles.sheet} role="dialog" aria-labelledby="peek-title">
       <div className={styles.sheetBar}>
         <h2 id="peek-title" className={styles.sheetTitle}>
-          Ingredients · {servings} {servings === 1 ? 'serving' : 'servings'}
+          Ingredients ·{' '}
+          {servingsText(servings, { servings: baseServings, servingsHigh: baseServingsHigh })}{' '}
+          {servings === 1 && (servings !== baseServings || baseServingsHigh === null)
+            ? 'serving'
+            : 'servings'}
         </h2>
         {hasSecondMeasure(ingredients) && (
           <button
@@ -247,6 +256,7 @@ interface CookRecipe {
   id: string;
   title: string;
   servings: number;
+  servingsHigh: number | null;
   steps: { id: string; position: number; text: string }[];
   ingredients: PeekIngredient[];
 }
@@ -461,6 +471,7 @@ function CookSession({
           <IngredientPeek
             ingredients={recipe.ingredients}
             baseServings={recipe.servings}
+            baseServingsHigh={recipe.servingsHigh}
             servings={servings}
             onClose={closePeek}
           />

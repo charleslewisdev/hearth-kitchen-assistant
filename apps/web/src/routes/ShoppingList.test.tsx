@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
-import { render, screen, fireEvent, cleanup, within } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, within, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { ShoppingList, LIST_REFRESH_MS } from './ShoppingList';
 import { trpc } from '../lib/trpc';
@@ -14,6 +14,7 @@ vi.mock('../lib/trpc', () => ({
       addItem: { useMutation: vi.fn() },
       toggleChecked: { useMutation: vi.fn() },
       removeItem: { useMutation: vi.fn() },
+      setAmount: { useMutation: vi.fn() },
       clearChecked: { useMutation: vi.fn() },
     },
   },
@@ -27,6 +28,7 @@ const useGetQuery = trpc.shoppingList.get.useQuery as unknown as Mock;
 const useAddItem = trpc.shoppingList.addItem.useMutation as unknown as Mock;
 const useToggleChecked = trpc.shoppingList.toggleChecked.useMutation as unknown as Mock;
 const useRemoveItem = trpc.shoppingList.removeItem.useMutation as unknown as Mock;
+const useSetAmount = trpc.shoppingList.setAmount.useMutation as unknown as Mock;
 const useClearChecked = trpc.shoppingList.clearChecked.useMutation as unknown as Mock;
 const useUtils = trpc.useUtils as unknown as Mock;
 
@@ -51,6 +53,7 @@ let addItemMutate: Mock;
 let toggleCheckedMutate: Mock;
 let removeItemMutate: Mock;
 let clearCheckedMutate: Mock;
+let setAmountMutate: Mock;
 
 function mockQuery(items: unknown[]) {
   useGetQuery.mockReturnValue({
@@ -65,11 +68,13 @@ beforeEach(() => {
   toggleCheckedMutate = vi.fn();
   removeItemMutate = vi.fn();
   clearCheckedMutate = vi.fn();
+  setAmountMutate = vi.fn();
 
   useAddItem.mockReturnValue({ mutate: addItemMutate, isPending: false });
   useToggleChecked.mockReturnValue({ mutate: toggleCheckedMutate, isPending: false });
   useRemoveItem.mockReturnValue({ mutate: removeItemMutate, isPending: false });
   useClearChecked.mockReturnValue({ mutate: clearCheckedMutate, isPending: false });
+  useSetAmount.mockReturnValue({ mutate: setAmountMutate, isPending: false });
   useUtils.mockReturnValue({
     shoppingList: { get: { invalidate: vi.fn() } },
   });
@@ -248,5 +253,202 @@ describe('changes show at once, and survive a dropped signal', () => {
     renderList();
     expect(screen.getByRole('checkbox', { name: 'Check coffee' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Remove coffee' })).toBeDisabled();
+  });
+});
+
+describe('editing an amount in place', () => {
+  it('opens a labelled box with the amount as the list shows it', () => {
+    mockQuery([makeItem({ id: 'i1', name: 'garlic', quantity: 16.166, unit: 'clove' })]);
+    renderList();
+
+    fireEvent.click(screen.getByRole('button', { name: '17 cloves, change amount of garlic' }));
+
+    const box = screen.getByRole('textbox', { name: 'Amount of garlic' });
+    expect(box).toHaveValue('17 cloves');
+    expect(box).toHaveFocus();
+  });
+
+  it('saves the typed amount with the amount it started from', () => {
+    mockQuery([makeItem({ id: 'i1', name: 'eggs', quantity: 6, unit: null })]);
+    renderList();
+
+    fireEvent.click(screen.getByRole('button', { name: '6, change amount of eggs' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Amount of eggs' }), {
+      target: { value: '1 1/2 dozen' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(setAmountMutate).toHaveBeenCalledWith({
+      itemId: 'i1',
+      text: '1 1/2 dozen',
+      seen: { quantity: 6, unit: null },
+    });
+    expect(screen.queryByRole('textbox', { name: 'Amount of eggs' })).not.toBeInTheDocument();
+  });
+
+  it('sends the amount seen when the box opened, even if another phone changed it since', () => {
+    mockQuery([makeItem({ id: 'i1', name: 'eggs', quantity: 6, unit: null })]);
+    const { rerender } = renderList();
+
+    fireEvent.click(screen.getByRole('button', { name: '6, change amount of eggs' }));
+    // The list refreshes while the box is open: another phone made it 12.
+    mockQuery([makeItem({ id: 'i1', name: 'eggs', quantity: 12, unit: null })]);
+    rerender(
+      <MemoryRouter>
+        <ShoppingList />
+      </MemoryRouter>,
+    );
+    const box = screen.getByRole('textbox', { name: 'Amount of eggs' });
+    expect(box).toHaveValue('6');
+    fireEvent.change(box, { target: { value: '8' } });
+    fireEvent.submit(box);
+
+    expect(setAmountMutate).toHaveBeenCalledWith({
+      itemId: 'i1',
+      text: '8',
+      seen: { quantity: 6, unit: null },
+    });
+  });
+
+  it('offers an amount for an item that has none, and saves on Enter', () => {
+    mockQuery([makeItem({ id: 'i1', name: 'paper towels', quantity: null, unit: null })]);
+    renderList();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add amount for paper towels' }));
+    const box = screen.getByRole('textbox', { name: 'Amount of paper towels' });
+    expect(box).toHaveValue('');
+    fireEvent.change(box, { target: { value: '2 packages' } });
+    fireEvent.submit(box);
+
+    expect(setAmountMutate).toHaveBeenCalledWith({
+      itemId: 'i1',
+      text: '2 packages',
+      seen: { quantity: null, unit: null },
+    });
+  });
+
+  it('keeps the box open and says why when the text is not an amount', () => {
+    mockQuery([makeItem({ id: 'i1', name: 'eggs', quantity: 6, unit: null })]);
+    renderList();
+
+    fireEvent.click(screen.getByRole('button', { name: '6, change amount of eggs' }));
+    const box = screen.getByRole('textbox', { name: 'Amount of eggs' });
+    fireEvent.change(box, { target: { value: 'a few' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(setAmountMutate).not.toHaveBeenCalled();
+    expect(box).toHaveAttribute('aria-invalid', 'true');
+    expect(box).toHaveAccessibleDescription(/Type an amount/);
+  });
+
+  it('closes without saving on Escape, on Cancel, or when nothing changed', () => {
+    mockQuery([makeItem({ id: 'i1', name: 'eggs', quantity: 6, unit: null })]);
+    renderList();
+    const open = () => {
+      fireEvent.click(screen.getByRole('button', { name: '6, change amount of eggs' }));
+      return screen.getByRole('textbox', { name: 'Amount of eggs' });
+    };
+
+    fireEvent.keyDown(open(), { key: 'Escape' });
+    expect(screen.queryByRole('textbox', { name: 'Amount of eggs' })).toBeNull();
+    expect(screen.getByRole('button', { name: '6, change amount of eggs' })).toHaveFocus();
+
+    open();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('textbox', { name: 'Amount of eggs' })).toBeNull();
+
+    open();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(screen.queryByRole('textbox', { name: 'Amount of eggs' })).toBeNull();
+    expect(setAmountMutate).not.toHaveBeenCalled();
+  });
+
+  it('will not edit the amount of an item the server has not confirmed yet', () => {
+    mockQuery([makeItem({ id: 'pending-coffee', name: 'coffee', quantity: null, unit: null })]);
+    renderList();
+    expect(screen.getByRole('button', { name: 'Add amount for coffee' })).toBeDisabled();
+  });
+});
+
+describe('an amount edit shows at once, and says when another phone got there first', () => {
+  function withCache(items: unknown[]) {
+    let data: { list: { id: string; householdId: string }; items: unknown[] } | undefined = {
+      list: { id: 'l1', householdId: 'h1' },
+      items,
+    };
+    const get = {
+      invalidate: vi.fn(),
+      cancel: vi.fn().mockResolvedValue(undefined),
+      getData: vi.fn(() => data),
+      setData: vi.fn((_input: unknown, updater: unknown) => {
+        data =
+          typeof updater === 'function'
+            ? (updater as (d: typeof data) => typeof data)(data)
+            : (updater as typeof data);
+      }),
+    };
+    useUtils.mockReturnValue({ shoppingList: { get } });
+    return { current: () => data };
+  }
+
+  type Options = {
+    onMutate: (input: unknown) => Promise<unknown>;
+    onError: (err: unknown, input: unknown, context: unknown) => void;
+    scope?: { id: string };
+  };
+  const options = () => useSetAmount.mock.calls.at(-1)?.[0] as Options;
+  const input = { itemId: 'i1', text: '1 dozen', seen: { quantity: 6, unit: null } };
+
+  it('changes the amount in the cache before the server answers', async () => {
+    const cache = withCache([makeItem({ id: 'i1', name: 'eggs', quantity: 6, unit: null })]);
+    mockQuery([makeItem({ id: 'i1', name: 'eggs', quantity: 6, unit: null })]);
+    renderList();
+
+    await act(() => options().onMutate(input));
+
+    expect(cache.current()?.items[0]).toMatchObject({ quantity: 1, unit: 'dozen' });
+  });
+
+  it('sends queued edits one at a time, so a second edit lands after the first', () => {
+    mockQuery([]);
+    renderList();
+    expect(options().scope).toEqual({ id: expect.any(String) });
+  });
+
+  it('rolls back and says so when another phone changed the amount first', async () => {
+    const cache = withCache([makeItem({ id: 'i1', name: 'eggs', quantity: 6, unit: null })]);
+    mockQuery([makeItem({ id: 'i1', name: 'eggs', quantity: 6, unit: null })]);
+    renderList();
+
+    const context = await act(() => options().onMutate(input));
+    act(() => options().onError({ data: { code: 'CONFLICT' } }, input, context));
+
+    expect(cache.current()?.items[0]).toMatchObject({ quantity: 6, unit: null });
+    expect(screen.getByRole('alert')).toHaveTextContent('changed on another phone');
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('says nothing for an item that is gone, since the list will show it gone', async () => {
+    const cache = withCache([makeItem({ id: 'i1', name: 'eggs', quantity: 6, unit: null })]);
+    mockQuery([makeItem({ id: 'i1', name: 'eggs', quantity: 6, unit: null })]);
+    renderList();
+
+    const context = await act(() => options().onMutate(input));
+    act(() => options().onError({ data: { code: 'NOT_FOUND' } }, input, context));
+
+    expect(cache.current()?.items[0]).toMatchObject({ quantity: 6 });
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('says the amount may not have been saved when the connection drops mid-request', async () => {
+    withCache([makeItem({ id: 'i1', name: 'eggs', quantity: 6, unit: null })]);
+    mockQuery([makeItem({ id: 'i1', name: 'eggs', quantity: 6, unit: null })]);
+    renderList();
+
+    const context = await act(() => options().onMutate(input));
+    act(() => options().onError(new TypeError('Failed to fetch'), input, context));
+
+    expect(screen.getByRole('alert')).toHaveTextContent('may not have been saved');
   });
 });

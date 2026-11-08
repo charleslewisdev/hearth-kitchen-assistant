@@ -178,12 +178,15 @@
 }
 
 .item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 52px;
   padding: 4px 6px 4px 14px;
   border-bottom: 1px solid var(--color-border);
+}
+
+.itemRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 52px;
 }
 
 .item:last-child {
@@ -216,12 +219,148 @@
   min-width: 0;
 }
 
+/* The amount is a button: tap it to change it in place. */
 .amount {
-  margin-left: auto;
-  padding-left: 8px;
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 0 8px;
+  background: none;
+  border: none;
+  border-radius: var(--radius-pill);
+  color: var(--color-text);
+  font: inherit;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  text-decoration: underline dotted var(--color-text-muted);
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+
+.amount:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.amount:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.amountEmpty {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.amountForm {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 0 10px 32px;
+}
+
+.amountFieldLabel {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.amountFieldRow {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.amountInput {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 12px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: 16px;
+}
+
+.amountInput:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.amountInput[aria-invalid='true'] {
+  border-color: var(--color-leftover-text);
+}
+
+.amountSave,
+.amountCancel {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.amountSave {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border: none;
+}
+
+.amountCancel {
+  background: none;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+}
+
+.amountHint,
+.amountError {
+  margin: 0;
+  font-size: 13px;
+}
+
+.amountHint {
+  color: var(--color-text-muted);
+}
+
+.amountError {
+  color: var(--color-leftover-text);
+}
+
+/* Stays in view at the top while the cook is scrolled down to the row it is about. */
+.notice {
+  position: sticky;
+  top: 8px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--color-flag-bg);
+  color: var(--color-flag-text);
+  border: 1px solid var(--color-flag-border);
+}
+
+.notice > span {
+  flex: 1;
+}
+
+.noticeDismiss {
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 0 12px;
+  background: none;
+  color: inherit;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .name {

@@ -11,7 +11,7 @@ To start, press **+ Add / Import**, then **By hand**.
 | Field           | What to put                                                                   |
 | --------------- | ----------------------------------------------------------------------------- |
 | **Title**       | Required. Everything else is optional.                                        |
-| **Servings**    | How many people the recipe feeds as written. A whole number, 1 or more.       |
+| **Servings**    | How many people the recipe feeds as written. A whole number, 1 or more. For a recipe that serves a range, put the most in **Up to**: 4, up to 6, shows as "Serves 4–6". |
 | **Recipe type** | Tick any of breakfast, lunch, dinner, snack, dessert, side, drink, sauce, base. Used by the filters. |
 | **Tags**        | Start typing: your matching tags drop down with how many recipes use each. **Enter** picks the highlighted one, a comma keeps what you typed. A tag you don't have yet shows as a dashed chip marked **new**. Tags you already use that the recipe mentions show below as **Suggested**. |
 | **Source**      | Where it came from by name: `Joy of Cooking, p. 212`, `King Arthur`. Sources you've used before are suggested as you type, and if you type a book another way ("Newlywed Cookbook" for "The Newlywed Cookbook"), Hearth offers the spelling you already use. |
@@ -23,7 +23,8 @@ To start, press **+ Add / Import**, then **By hand**.
 
 Press **Save** at the bottom. Hearth opens the saved recipe.
 
-Servings matter. Scaling and the shopping list both work from this number. If a recipe says
+Servings matter. Scaling and the shopping list both work from this number, and for a range, from
+the lower one: a recipe that serves 4–6, cooked for 8, is doubled. If a recipe says
 "makes 24 cookies", decide what one serving is for your family, or enter 24 and treat each cookie
 as a serving.
 
@@ -72,8 +73,8 @@ Examples:
 Hearth reads whole numbers (`2`), decimals (`1.5`, `.5`), fractions (`1/2`), mixed numbers
 (`1 1/2`) and fraction characters (`½`, `1½`).
 
-A range (`2-3`, `4 to 5`, `2 or 3`) is read, but only its **low end** is kept. `4 to 5
-tablespoons` is stored as 4. If you want the high end, type it.
+A range (`2-3`, `4 to 5`, `2 or 3`) keeps both ends: `4 to 5 tablespoons` shows as 4–5 tbsp,
+and scaling changes both ends. The shopping list buys the high end.
 
 Amounts written as words are read at the start of a line: `a`, `an`, `one` to `twelve`, `half`
 and `one and a half`. `a green bell pepper` is 1 green bell pepper. Vague words such as `a few`

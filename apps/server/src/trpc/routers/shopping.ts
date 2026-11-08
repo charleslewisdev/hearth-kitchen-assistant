@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
+import { MAX_LIST_AMOUNT_LENGTH, parseListAmount } from '@hearth/shared';
 import { router, protectedProcedure } from '../trpc';
 import * as shopping from '../../repo/shopping';
 
@@ -26,6 +28,26 @@ export const shoppingRouter = router({
     .mutation(({ ctx, input }) => {
       const { itemId, ...patch } = input;
       return shopping.updateItem(ctx.householdId, itemId, patch);
+    }),
+  // Change one item's amount in place from what the cook typed (D54). `seen` is the amount the
+  // edit started from; the repo refuses the edit with CONFLICT if the item no longer has it.
+  setAmount: protectedProcedure
+    .input(
+      z.object({
+        itemId: z.string().uuid(),
+        // Room for surrounding spaces; the parser takes MAX_LIST_AMOUNT_LENGTH once trimmed.
+        text: z.string().max(MAX_LIST_AMOUNT_LENGTH * 2),
+        seen: z.object({
+          quantity: z.number().finite().nullable(),
+          unit: z.string().max(MAX_LIST_AMOUNT_LENGTH).nullable(),
+        }),
+      }),
+    )
+    .mutation(({ ctx, input }) => {
+      const amount = parseListAmount(input.text);
+      // The text stays out of the message (D38).
+      if (!amount) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Not an amount' });
+      return shopping.setItemAmount(ctx.householdId, input.itemId, amount, input.seen);
     }),
   toggleChecked: protectedProcedure
     .input(z.object({ itemId: z.string().uuid(), checked: z.boolean() }))

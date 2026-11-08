@@ -188,6 +188,13 @@ describe('Library', () => {
     );
   });
 
+  it('shows a servings range on a card (D53)', () => {
+    mockQuery({ data: [{ ...CARDS[0]!, servingsHigh: 6 }] });
+    renderLibrary();
+    const soup = screen.getByRole('link', { name: /White Bean Soup/ });
+    expect(within(soup).getByText('Serves 4–6')).toBeInTheDocument();
+  });
+
   it('shows a card’s types, tags, servings and total time, and no time when there is none', () => {
     mockQuery({ data: CARDS });
     renderLibrary();

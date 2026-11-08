@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import {
-  formatQuantity,
+  formatQuantityRange,
   pickMeasure,
-  scale,
+  scaleRange,
   unitLabel,
   type MeasureSystem,
   type ScalingMode,
@@ -39,6 +39,8 @@ export function useMeasureSystem(): [MeasureSystem, (system: MeasureSystem) => v
 /** An ingredient as the recipe screen and cook mode both have it. */
 export interface MeasuredIngredient {
   quantity: number | null;
+  /** The high end of a range ("2-3 cloves"), when the line gives one (D53). */
+  quantityHigh?: number | null;
   unit: string | null;
   altQuantity?: number | null;
   altUnit?: string | null;
@@ -47,8 +49,9 @@ export interface MeasuredIngredient {
 
 /**
  * The amount to show, in the system picked and scaled to the servings chosen: "360 g", "3
- * cups", or null for a line with no amount. The second measure scales with the first, since
- * both are the same amount.
+ * cups", "2–3 cloves", or null for a line with no amount. The second measure scales with the
+ * first, since both are the same amount. A range scales at both ends (D53); the second measure is
+ * one number, so a cook reading it sees that one number.
  */
 export function amountText(
   ingredient: MeasuredIngredient,
@@ -64,12 +67,19 @@ export function amountText(
     },
     system,
   );
-  const scaled = scale(
-    { quantity: picked.quantity, mode: ingredient.scalingMode as ScalingMode },
+  const scaled = scaleRange(
+    {
+      quantity: picked.quantity,
+      quantityHigh: picked.alternate ? null : (ingredient.quantityHigh ?? null),
+      mode: ingredient.scalingMode as ScalingMode,
+    },
     servings,
   );
-  if (scaled === null) return null;
-  return `${formatQuantity(scaled, picked.unit)}${picked.unit ? ` ${unitLabel(picked.unit, scaled)}` : ''}`;
+  if (scaled.quantity === null) return null;
+  const amount = formatQuantityRange(scaled.quantity, scaled.quantityHigh, picked.unit);
+  // The unit agrees with the larger end: "½–1 cup", "1–2 cups".
+  const forUnit = scaled.quantityHigh ?? scaled.quantity;
+  return `${amount}${picked.unit ? ` ${unitLabel(picked.unit, forUnit)}` : ''}`;
 }
 
 /** Whether any line of a recipe has a second measure, which is when the switch is worth showing. */

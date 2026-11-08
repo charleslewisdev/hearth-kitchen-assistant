@@ -68,7 +68,7 @@ _Last updated: 2026-09-10 (P1 and P2 complete: cook mode, search, and all four i
 | # | Capability | Tier | Notes |
 |---|---|---|---|
 | G1 | Magic-link share (flat permission: have link = have recipe) | Core | |
-| G2 | Markdown export/import between instances | Core | Backs "no lock-in". |
+| G2 | Markdown export/import between instances | Core | Backs "no lock-in". Shipped: D52 (one file at a time on import; no photos). |
 | G3 | PDF export (print-to-PDF acceptable) | Core | |
 | G4 | Print a recipe | Core | |
 

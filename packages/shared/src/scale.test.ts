@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { scale } from './scale';
+import { scale, scaleRange } from './scale';
 
 describe('scale', () => {
   it('scales linearly up', () => {
@@ -24,5 +24,34 @@ describe('scale', () => {
   });
   it('guards against a zero "from" serving count (returns quantity unchanged)', () => {
     expect(scale({ quantity: 2, mode: 'linear' }, { from: 0, to: 8 })).toBe(2);
+  });
+});
+
+describe('scaleRange', () => {
+  it('scales both ends of a range', () => {
+    expect(
+      scaleRange({ quantity: 2, quantityHigh: 3, mode: 'linear' }, { from: 4, to: 8 }),
+    ).toEqual({ quantity: 4, quantityHigh: 6 });
+    expect(
+      scaleRange({ quantity: 0.25, quantityHigh: 0.5, mode: 'linear' }, { from: 4, to: 6 }),
+    ).toEqual({ quantity: 0.375, quantityHigh: 0.75 });
+  });
+  it('leaves a single amount single, and a fixed range as it is', () => {
+    expect(
+      scaleRange({ quantity: 2, quantityHigh: null, mode: 'linear' }, { from: 4, to: 8 }),
+    ).toEqual({ quantity: 4, quantityHigh: null });
+    expect(scaleRange({ quantity: 1, quantityHigh: 2, mode: 'fixed' }, { from: 4, to: 8 })).toEqual(
+      { quantity: 1, quantityHigh: 2 },
+    );
+  });
+  it('is one amount when rounding brings the ends together', () => {
+    expect(
+      scaleRange({ quantity: 0.0001, quantityHigh: 0.0002, mode: 'linear' }, { from: 4, to: 4 }),
+    ).toEqual({ quantity: 0, quantityHigh: null });
+  });
+  it('has no high end without a low one', () => {
+    expect(
+      scaleRange({ quantity: null, quantityHigh: 2, mode: 'linear' }, { from: 4, to: 8 }),
+    ).toEqual({ quantity: null, quantityHigh: null });
   });
 });

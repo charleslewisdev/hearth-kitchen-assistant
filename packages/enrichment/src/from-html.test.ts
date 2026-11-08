@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { parseIngredientLine } from '@hearth/shared';
 import { draftFromHtml } from './from-html';
+import { draftToCreateInput } from './draft';
 
 /**
  * Fixtures are checked-in HTML. All are hand-authored: invented recipes in the markup shapes real
@@ -568,6 +569,65 @@ describe('shapes real sites emit that the fixtures do not cover', () => {
     expect(draft?.servings.confidence).toBe('low');
   });
 
+  it.each([
+    ['4-6 servings', 4, 6],
+    ['4 to 6 servings', 4, 6],
+    ['Serves 4-6', 4, 6],
+    ['serves: 4 – 6', 4, 6],
+    ['4-6', 4, 6],
+    ['6 to 8', 6, 8],
+    [['4-6', '4-6 servings'], 4, 6],
+  ])('keeps both ends of a recipeYield range %j', (recipeYield, low, high) => {
+    const draft = draftFromHtml(
+      wrap(
+        JSON.stringify({
+          '@type': 'Recipe',
+          name: 'S',
+          recipeYield,
+          recipeIngredient: ['1 onion'],
+        }),
+      ),
+      'https://example.com/',
+    );
+    expect(draft?.servings.value).toBe(low);
+    expect(draft?.servings.confidence).toBe('high');
+    expect(draft?.servingsHigh).toBe(high);
+  });
+
+  it('has no high end for a single yield or a range that does not rise', () => {
+    for (const recipeYield of [
+      '4 servings',
+      'Serves 4',
+      '6',
+      '6-6',
+      '6-4 servings',
+      '1 loaf, 10 serving(s)',
+    ]) {
+      const draft = draftFromHtml(
+        wrap(
+          JSON.stringify({
+            '@type': 'Recipe',
+            name: 'S',
+            recipeYield,
+            recipeIngredient: ['1 onion'],
+          }),
+        ),
+        'https://example.com/',
+      );
+      expect(draft?.servingsHigh).toBeNull();
+    }
+  });
+
+  it('keeps a servings range on the way to recipe.create', () => {
+    const draft = draftFromHtml(
+      wrap(
+        '{"@type":"Recipe","name":"S","recipeYield":"4-6 servings","recipeIngredient":["1 onion"]}',
+      ),
+      'https://example.com/',
+    );
+    expect(draftToCreateInput(draft!)).toMatchObject({ servings: 4, servingsHigh: 6 });
+  });
+
   it('needs more than a name to call something a recipe', () => {
     // A Recipe node with neither ingredients nor steps is a stub, and importing it would give
     // the cook an empty draft with a title on it.
@@ -599,6 +659,19 @@ describe('hostile pages finish in linear time', () => {
         recipeIngredient: ['x'],
         recipeYield: '1'.repeat(RUN),
       }),
+    );
+    expect(ms).toBeLessThan(500);
+  });
+
+  it.each([
+    ['digits around a dash', `${'1'.repeat(RUN)}-${'2'.repeat(RUN)} servings`],
+    ['spaces before "to"', `4${' '.repeat(RUN)}to 6 servings`],
+    ['a run of "serves"', 'serves '.repeat(RUN / 8)],
+    ['repeated short ranges', '1-2 '.repeat(RUN / 4)],
+    ['serves then spaces', `serves${' '.repeat(RUN)}4`],
+  ])('a recipeYield range made of %s', (_name, recipeYield) => {
+    const { ms } = timed(
+      recipePage({ '@type': 'Recipe', name: 'r', recipeIngredient: ['x'], recipeYield }),
     );
     expect(ms).toBeLessThan(500);
   });

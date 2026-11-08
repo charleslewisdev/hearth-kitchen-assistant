@@ -279,6 +279,39 @@ Soften the onion in the oil, add the lentils and the stock, and simmer for half 
     expect(draft.ingredientLines.confidence).toBe('low');
   });
 
+  it('reads text with front matter as a Markdown recipe, stated field for field', async () => {
+    const caller = await uploadCaller();
+    const draft = await caller.import.fromText({
+      text: '---\ntitle: "Lentil Soup"\nservings: 4\nrating: 5\n---\n## Ingredients\n- 1 cup brown lentils\n## Method\n1. Simmer.\n',
+    });
+    expect(draft.source).toEqual({
+      kind: 'markdown',
+      sourceName: null,
+      sourceUrl: null,
+      rating: 5,
+    });
+    expect(draft.title).toEqual({ value: 'Lentil Soup', confidence: 'high', raw: 'Lentil Soup' });
+    expect(draft.ingredientLines.value).toEqual(['1 cup brown lentils']);
+    expect(draft.steps.value).toEqual(['Simmer.']);
+    expect(await caller.recipe.list()).toEqual([]);
+  });
+
+  it('sends Markdown without front matter through the text heuristics, as before', async () => {
+    const caller = await uploadCaller();
+    const draft = await caller.import.fromText({
+      text: `# Weeknight Lentil Soup\n\n## Ingredients\n\n- 2 Tbsp olive oil\n- 1 cup brown lentils\n\n## Method\n\n1. Simmer for half an hour.`,
+    });
+    expect(draft.source).toEqual({ kind: 'text' });
+    expect(draft.ingredientLines.value.length).toBeGreaterThan(0);
+  });
+
+  it('sends a paste that opens with a horizontal rule to the text heuristics', async () => {
+    const caller = await uploadCaller();
+    const draft = await caller.import.fromText({ text: `---\n${PASTED}\n---\n` });
+    expect(draft.source).toEqual({ kind: 'text' });
+    expect(draft.ingredientLines.value).toHaveLength(4);
+  });
+
   it('says so when the text had no recipe in it', async () => {
     const caller = await uploadCaller();
     await expect(
