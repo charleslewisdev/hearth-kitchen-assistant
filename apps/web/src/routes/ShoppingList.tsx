@@ -18,6 +18,7 @@ import { trpc } from '../lib/trpc';
 import { departmentStyle } from '../lib/departments';
 import styles from './ShoppingList.module.css';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
+import { ShoppingListPrint } from './ShoppingListPrint';
 
 // One shopping-list item as returned by `shoppingList.get`.
 type Item = {
@@ -233,7 +234,28 @@ export function ShoppingList() {
 
   return (
     <section className={styles.screen}>
-      <h1 className={styles.title}>Shopping list</h1>
+      <div className={styles.header}>
+        <h1 className={styles.title}>Shopping list</h1>
+        {/* What is left to buy, on paper: checked items are in the basket already. */}
+        {unchecked.length > 0 && (
+          <button type="button" className={styles.printButton} onClick={() => window.print()}>
+            Print
+          </button>
+        )}
+      </div>
+      {unchecked.length > 0 && (
+        <ShoppingListPrint
+          sections={sections.map(({ department, items }) => ({
+            department,
+            items: items.map(({ id, name, note, quantity, unit }) => ({
+              id,
+              name,
+              note,
+              amount: amountLabel(quantity, unit),
+            })),
+          }))}
+        />
+      )}
 
       {items.length > 0 && (
         <div className={styles.progress}>

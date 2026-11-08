@@ -85,8 +85,10 @@ test('grocery mvp happy path: recipe -> list -> staple -> check off', async ({ p
 
   await expect(page.getByRole('heading', { name: 'Produce' })).toBeVisible(); // garlic
   await expect(page.getByRole('heading', { name: 'Pantry' })).toBeVisible(); // salt
-  await expect(page.getByText('garlic')).toBeVisible();
-  await expect(page.getByText('salt')).toBeVisible();
+  // In the screen: the print sheet beside it in <body> holds the same lines, hidden.
+  const list = page.getByRole('main');
+  await expect(list.getByText('garlic')).toBeVisible();
+  await expect(list.getByText('salt')).toBeVisible();
 
   const brothItem = page.getByRole('listitem').filter({ hasText: 'broth' });
   await expect(brothItem).toBeVisible();
@@ -97,7 +99,7 @@ test('grocery mvp happy path: recipe -> list -> staple -> check off', async ({ p
   // 6. Add a manual staple via the add bar.
   await page.getByLabel('Add a staple').fill('paper towels');
   await page.getByRole('button', { name: 'Add', exact: true }).click();
-  await expect(page.getByText('paper towels')).toBeVisible();
+  await expect(list.getByText('paper towels')).toBeVisible();
 
   // 7. Check the staple off -> it moves into the collapsible "Done" group.
   await page.getByRole('checkbox', { name: 'Check paper towels' }).click();

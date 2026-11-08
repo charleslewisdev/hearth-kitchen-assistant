@@ -166,8 +166,8 @@ describe('Print', () => {
 
   it('takes over printing only while it is on screen, so other screens still print', () => {
     const { unmount } = render(<PrintSheet recipe={RECIPE} view={VIEW} coverFileId={null} />);
-    expect(document.body).toHaveAttribute('data-printing-recipe');
+    expect(document.body).toHaveAttribute('data-printing');
     unmount();
-    expect(document.body).not.toHaveAttribute('data-printing-recipe');
+    expect(document.body).not.toHaveAttribute('data-printing');
   });
 });
