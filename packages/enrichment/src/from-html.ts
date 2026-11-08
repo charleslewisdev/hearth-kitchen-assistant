@@ -125,6 +125,28 @@ function findRecipeNode($: cheerio.CheerioAPI): Record<string, JsonValue> | null
 
 /* ------------------------------------------------------------------- fields */
 
+/** How one end of a servings range is joined to the other: "4-6", "4 – 6", "4 to 6". */
+const SERVINGS_TO = '\\s{0,3}(?:[-–]|to)\\s{0,3}';
+
+/** A `recipeYield` that is only a range: "4-6", "4 to 6". */
+const BARE_SERVINGS_RANGE = new RegExp(`^(\\d{1,3})${SERVINGS_TO}(\\d{1,3})$`, 'i');
+
+/**
+ * A count the page names as servings, maybe a range: "4 servings", "4-6 servings", "6 people".
+ * `(?<!\d)` keeps it linear: without it every digit of a long run starts a fresh attempt, and
+ * the ends are bounded so a run cannot be split every way.
+ */
+const NAMED_SERVINGS = new RegExp(
+  `(?<!\\d)(\\d{1,3})(?:${SERVINGS_TO}(\\d{1,3}))?\\s{0,3}(?:serving|portion|people|serves)`,
+  'i',
+);
+
+/** "Serves 4", "Serves 4-6", "serves: 4 to 6": the count after the word. Bounded, so linear. */
+const SERVES_COUNT = new RegExp(
+  `\\bserves\\s{0,3}:?\\s{0,3}(\\d{1,3})(?:${SERVINGS_TO}(\\d{1,3}))?(?!\\d)`,
+  'i',
+);
+
 /**
  * A serving count out of whatever `recipeYield` turned out to be.
  *
@@ -136,37 +158,49 @@ function findRecipeNode($: cheerio.CheerioAPI): Record<string, JsonValue> | null
  */
 function readServings(raw: JsonValue | undefined): {
   value: number;
+  high: number | null;
   confidence: 'high' | 'low';
   raw: string | null;
 } {
   const candidates = asArray(raw)
     .map((entry) => text(entry))
     .filter((entry) => entry !== '');
-  if (candidates.length === 0) return { value: 1, confidence: 'low', raw: null };
+  if (candidates.length === 0) return { value: 1, high: null, confidence: 'low', raw: null };
 
   const rawText = candidates.join(', ');
   const sane = (n: number): boolean => Number.isInteger(n) && n >= 1 && n <= MAX_SERVINGS;
+  // A range's high end is kept only when it is a serving count above the low one (D53).
+  const upTo = (low: number, high: string | undefined): number | null => {
+    const n = Number(high);
+    return high !== undefined && sane(n) && n > low ? n : null;
+  };
 
   for (const candidate of candidates) {
     if (/^\d+$/.test(candidate) && sane(Number(candidate))) {
-      return { value: Number(candidate), confidence: 'high', raw: rawText };
+      return { value: Number(candidate), high: null, confidence: 'high', raw: rawText };
+    }
+    // A bare range, "4-6" or "4 to 6". Anchored at both ends and bounded, so linear.
+    const range = candidate.match(BARE_SERVINGS_RANGE);
+    if (range && sane(Number(range[1]))) {
+      const low = Number(range[1]);
+      return { value: low, high: upTo(low, range[2]), confidence: 'high', raw: rawText };
     }
   }
   for (const candidate of candidates) {
-    // `(?<!\d)` keeps this linear: without it every digit of a long run starts a fresh attempt.
-    const named = candidate.match(/(?<!\d)(\d+)\s*(?:serving|portion|people|serves)/i);
+    const named = candidate.match(NAMED_SERVINGS) ?? candidate.match(SERVES_COUNT);
     if (named && sane(Number(named[1]))) {
-      return { value: Number(named[1]), confidence: 'high', raw: rawText };
+      const low = Number(named[1]);
+      return { value: low, high: upTo(low, named[2]), confidence: 'high', raw: rawText };
     }
   }
   for (const candidate of candidates) {
     const first = candidate.match(/\d+/);
     if (first && sane(Number(first[0]))) {
       // A number, but not one the page called a serving count: "24 cookies" is a yield.
-      return { value: Number(first[0]), confidence: 'low', raw: rawText };
+      return { value: Number(first[0]), high: null, confidence: 'low', raw: rawText };
     }
   }
-  return { value: 1, confidence: 'low', raw: rawText };
+  return { value: 1, high: null, confidence: 'low', raw: rawText };
 }
 
 /** Split one blob of instructions into steps. Only reached when the site gave a single string. */
@@ -451,6 +485,7 @@ function draftFromStructuredData($: cheerio.CheerioAPI, url: string): RecipeDraf
 
   const servings = readServings(node['recipeYield']);
   draft.servings = field(servings.value, servings.confidence, servings.raw);
+  draft.servingsHigh = servings.high;
 
   draft.ingredientLines = field(ingredientLines, 'high', null);
   draft.steps = field(steps.value, steps.confidence, null);

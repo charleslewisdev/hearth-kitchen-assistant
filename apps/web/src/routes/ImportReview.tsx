@@ -11,6 +11,8 @@ import { TagInput } from './TagInput';
 import { SourceField } from './SourceField';
 import { TagSuggestionChips } from './TagSuggestionChips';
 import styles from './ImportReview.module.css';
+import { servingsHighFrom } from '../lib/servings';
+import { ServingsHighHint } from './ServingsHighHint';
 
 /**
  * Reviewing an imported draft before it becomes a recipe (D29).
@@ -222,6 +224,10 @@ export function ImportReview({
 
   const [title, setTitle] = useState(() => reviewed(draft.title));
   const [servings, setServings] = useState(() => reviewed(draft.servings));
+  // The high end when the source gave a range ("Serves 4-6"), as the box holds it (D53).
+  const [servingsHighText, setServingsHighText] = useState(() =>
+    draft.servingsHigh == null ? '' : String(draft.servingsHigh),
+  );
   const [mealTypes, setMealTypes] = useState(() => reviewed(draft.mealTypes));
   // Tags: only the household's own tags are filled in; a site's keywords are offered, one tap
   // each (`suggestTags`). Held as the box's raw text, so a comma can be typed. `null` until the
@@ -285,11 +291,15 @@ export function ImportReview({
   const canSave =
     title.value.trim() !== '' && typedSourceUrl !== 'invalid' && !create.isPending && !keeping;
 
+  const servingsHighIgnored =
+    servingsHighText.trim() !== '' && servingsHighFrom(servingsHighText, servings.value) === null;
+
   async function handleSave() {
     if (!canSave) return;
     const saved = await create.mutateAsync({
       title: title.value.trim(),
       servings: servings.value,
+      servingsHigh: servingsHighFrom(servingsHighText, servings.value),
       mealTypes: mealTypes.value,
       tags,
       ingredientLines,
@@ -357,27 +367,44 @@ export function ImportReview({
           </Flag>
         )}
 
-        <label className={styles.field}>
-          <span className={styles.label}>Servings</span>
-          <input
-            type="number"
-            min={1}
-            className={servings.flagged ? styles.inputFlagged : styles.input}
-            aria-describedby={describedBy('servings-flag', servings.flagged)}
-            value={servings.value}
-            onChange={(e) =>
-              setServings({
-                ...servings,
-                // An empty or unreadable box falls back to 1 rather than to NaN, which would
-                // reach `recipe.create` and be refused after the cook had left the screen.
-                value: Number.isFinite(e.target.valueAsNumber)
-                  ? Math.max(1, Math.trunc(e.target.valueAsNumber))
-                  : 1,
-                flagged: false,
-              })
-            }
-          />
-        </label>
+        <div className={styles.timeRow}>
+          <label className={styles.field}>
+            <span className={styles.label}>Servings</span>
+            <input
+              type="number"
+              min={1}
+              className={servings.flagged ? styles.inputFlagged : styles.input}
+              aria-describedby={describedBy('servings-flag', servings.flagged)}
+              value={servings.value}
+              onChange={(e) =>
+                setServings({
+                  ...servings,
+                  // An empty or unreadable box falls back to 1 rather than to NaN, which would
+                  // reach `recipe.create` and be refused after the cook had left the screen.
+                  value: Number.isFinite(e.target.valueAsNumber)
+                    ? Math.max(1, Math.trunc(e.target.valueAsNumber))
+                    : 1,
+                  flagged: false,
+                })
+              }
+            />
+          </label>
+          <label className={styles.field}>
+            <span className={styles.label}>Up to (optional)</span>
+            <input
+              type="number"
+              min={servings.value + 1}
+              inputMode="numeric"
+              className={styles.input}
+              value={servingsHighText}
+              aria-describedby={servingsHighIgnored ? 'servings-high-hint' : undefined}
+              onChange={(e) => setServingsHighText(e.target.value)}
+            />
+          </label>
+        </div>
+        <p id="servings-high-hint" className={styles.hint} aria-live="polite">
+          {servingsHighIgnored && <ServingsHighHint servings={servings.value} />}
+        </p>
         {servings.flagged && (
           <Flag id="servings-flag">
             {servings.raw === null

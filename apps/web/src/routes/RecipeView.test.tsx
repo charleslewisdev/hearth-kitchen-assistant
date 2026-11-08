@@ -282,6 +282,45 @@ describe('RecipeView', () => {
   });
 });
 
+describe('a recipe with ranges (D53)', () => {
+  const RANGED = {
+    ...RECIPE,
+    servingsHigh: 6,
+    ingredients: [
+      {
+        ...RECIPE.ingredients[0]!,
+        id: 'g',
+        quantity: 2,
+        quantityHigh: 3,
+        unit: 'clove',
+        rawText: '2-3 cloves garlic',
+        foodName: 'garlic',
+      },
+    ],
+  };
+
+  it('shows the servings range and both ends of an amount at its own servings', () => {
+    useGetQuery.mockReturnValue({ data: RANGED, isLoading: false, isError: false });
+    renderView();
+    expect(screen.getByLabelText('Servings')).toHaveTextContent('4–6');
+    const garlic = screen.getByText('garlic').closest('li') as HTMLElement;
+    expect(garlic.textContent).toContain('2–3 cloves');
+  });
+
+  it('scales from the low end, both ends at once, and sends the number picked to the list', async () => {
+    useGetQuery.mockReturnValue({ data: RANGED, isLoading: false, isError: false });
+    renderView();
+    for (let i = 0; i < 4; i++) {
+      fireEvent.click(screen.getByRole('button', { name: 'Increase servings' }));
+    }
+    expect(screen.getByLabelText('Servings')).toHaveTextContent(/^8$/);
+    const garlic = screen.getByText('garlic').closest('li') as HTMLElement;
+    expect(garlic.textContent).toContain('4–6 cloves');
+    fireEvent.click(screen.getByRole('button', { name: 'Add to list' }));
+    expect(mutateAsync).toHaveBeenCalledWith({ recipeId: 'r1', servings: 8 });
+  });
+});
+
 describe('where an imported recipe came from', () => {
   /** The same render, over a recipe with a different `sourceUrl` on it. */
   function renderWith(recipe: Record<string, unknown>) {

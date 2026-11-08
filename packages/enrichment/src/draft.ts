@@ -71,6 +71,12 @@ export type DraftSource =
 export interface RecipeDraft {
   title: DraftField<string>;
   servings: DraftField<number>;
+  /**
+   * The high end when the source gives the yield as a range ("Serves 4-6", "4-6 servings"):
+   * `servings` holds the low end, and this the high one, always above it (D53). It shares the
+   * servings field's confidence and source words; null when the yield is one number.
+   */
+  servingsHigh: number | null;
   mealTypes: DraftField<MealType[]>;
   tags: DraftField<string[]>;
   ingredientLines: DraftField<string[]>;
@@ -100,6 +106,8 @@ export interface RecipeDetails {
 export interface RecipeCreateInput {
   title: string;
   servings: number;
+  /** The high end of a servings range; absent when the yield is one number. */
+  servingsHigh?: number;
   mealTypes: MealType[];
   tags: string[];
   ingredientLines: string[];
@@ -137,6 +145,7 @@ export function emptyDraft(source: DraftSource): RecipeDraft {
   return {
     title: field('', 'low', null),
     servings: field(1, 'low', null),
+    servingsHigh: null,
     mealTypes: field<MealType[]>([], 'low', null),
     tags: field<string[]>([], 'low', null),
     ingredientLines: field<string[]>([], 'low', null),
@@ -171,6 +180,7 @@ export function draftToCreateInput(draft: RecipeDraft): RecipeCreateInput {
   return {
     title: draft.title.value,
     servings: draft.servings.value,
+    ...(draft.servingsHigh !== null ? { servingsHigh: draft.servingsHigh } : {}),
     mealTypes: draft.mealTypes.value,
     tags: draft.tags.value,
     ingredientLines: draft.ingredientLines.value,

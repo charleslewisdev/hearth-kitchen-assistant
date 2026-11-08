@@ -115,7 +115,8 @@ guess. It looks for:
   "Directions", "Method" or "Steps". With both headings, it takes everything between them as ingredients, even lines with no
   amounts.
 - **A title:** the first sensible line above the ingredients.
-- **Servings:** a line like "Serves 4", "4 servings", "Makes 12" or "Yield: 6".
+- **Servings:** a line like "Serves 4", "4 servings", "Makes 12" or "Yield: 6", or a range such
+  as "Serves 4 to 6", which fills **Servings** and **Up to**.
 - **Steps:** everything after the ingredients. Numbered steps (`1.`, `2)`, `Step 3`) are split on
   the numbers. Otherwise bulleted lines, otherwise blank lines.
 - **The end:** a line that is only a heading such as "Notes", "Tips", "Nutrition", "Variations",
@@ -333,7 +334,8 @@ press **Read**. Hearth starts from the file names, but only you can see which pa
   screen and in its **Filters** panel. Adding tags later means opening every recipe again.
 - **Put the book and page in Source**, for example `Joy of Cooking, p. 212`. It shows on the
   recipe as "From Joy of Cooking, p. 212". Photos are not kept with the recipe.
-- **Set servings every time.** A cookbook's "Serves 4 to 6" reads as 4.
+- **Check servings every time.** A cookbook's "Serves 4 to 6" reads as 4, up to 6; a yield that
+  is not a head count ("Makes 24") needs deciding.
 - **Keep food names consistent** across recipes (see
   [the tips](adding-recipes.md#tips-for-lines-the-parser-gets-wrong)). It pays off on the
   shopping list.

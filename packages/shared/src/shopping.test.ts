@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isNeverBought, itemMergeKey } from './shopping';
+import { isNeverBought, itemMergeKey, quantityToBuy } from './shopping';
 
 const base = { foodId: 'f1', unit: 'cup', quantity: 1 };
 
@@ -48,5 +48,18 @@ describe('isNeverBought', () => {
     '',
   ])('buys %j', (name) => {
     expect(isNeverBought(name)).toBe(false);
+  });
+});
+
+describe('quantityToBuy', () => {
+  it('buys the high end of a range', () => {
+    expect(quantityToBuy(2, 3)).toBe(3);
+  });
+  it('buys a single amount as it is', () => {
+    expect(quantityToBuy(2, null)).toBe(2);
+  });
+  it('buys nothing measured for a line with no amount', () => {
+    expect(quantityToBuy(null, null)).toBeNull();
+    expect(quantityToBuy(null, 3)).toBeNull();
   });
 });

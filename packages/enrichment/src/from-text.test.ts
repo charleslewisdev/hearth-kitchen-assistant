@@ -382,6 +382,49 @@ describe('how many it serves', () => {
     expect(withYield(line).servings.value).toBe(expected);
   });
 
+  it.each([
+    ['Serves 4 to 6', 4, 6],
+    ['Serves 4-6', 4, 6],
+    ['4–6 servings', 4, 6],
+    ['Yield: 6 to 8 servings', 6, 8],
+    ['Makes about 12 - 16', 12, 16],
+  ])('keeps both ends of %s', (line, low, high) => {
+    const draft = withYield(line);
+    expect(draft.servings.value).toBe(low);
+    expect(draft.servingsHigh).toBe(high);
+    expect(draft.servings.raw).toBe(line);
+  });
+
+  it('has no high end for one count, or a range that does not rise', () => {
+    expect(withYield('Serves 6').servingsHigh).toBeNull();
+    expect(withYield('Serves 6-4').servingsHigh).toBeNull();
+    expect(withYield('Serves 8 - Prep 10 minutes').servingsHigh).toBeNull();
+    // The 9 of a pan size is not a serving count.
+    expect(withYield('Makes 1 - 9x13 pan').servingsHigh).toBeNull();
+  });
+
+  it('does not take the end of a range as the whole count', () => {
+    // Before ranges were read, "4-6 servings" was 6: the pattern started at the 6.
+    expect(withYield('4-6 servings').servings.value).toBe(4);
+  });
+
+  it('reads a servings range in linear time over hostile runs', () => {
+    const hostile = [
+      `${'1'.repeat(60_000)}-${'2'.repeat(60_000)} servings`,
+      `Serves 4${' '.repeat(60_000)}to 6`,
+      `4${' '.repeat(60_000)}to 6 servings`,
+      '1-2 '.repeat(20_000),
+      `serves${' '.repeat(60_000)}4`,
+    ];
+    for (const line of hostile) {
+      const started = Date.now();
+      draftFromText(`Soup\n${line}\n\n2 cups stock\n1 tsp salt\n1 onion\n\nSimmer.`, {
+        kind: PASTED,
+      });
+      expect(Date.now() - started).toBeLessThan(500);
+    }
+  });
+
   it('falls back to 1 when nothing says, and keeps raw empty rather than inventing a source', () => {
     const draft = at('Cookies\n\n2 cups flour\n1 cup sugar\n2 eggs\n\nBake them.');
     expect(draft.servings.value).toBe(1);

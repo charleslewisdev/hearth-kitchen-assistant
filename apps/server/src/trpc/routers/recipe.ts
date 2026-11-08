@@ -59,6 +59,8 @@ const sourceUrl = z
 const recipeFields = {
   title: z.string().min(1),
   servings: z.number().int().positive().default(1),
+  // The high end of a servings range (D53); must be above `servings`, checked below.
+  servingsHigh: z.number().int().positive().max(10_000).nullable().optional(),
   mealTypes: z.array(z.enum(MEAL_TYPES)).default([]),
   tags: z.array(z.string()).default([]),
   ingredientLines: z.array(z.string()).default([]),
@@ -73,6 +75,15 @@ const recipeFields = {
   sourceUrl: sourceUrl.nullable().optional(),
 };
 
+/** A servings range runs upward: "4 to 6", never "6 to 4" (the CHECK in migration 0016). */
+function servingsRangeRises(input: { servings: number; servingsHigh?: number | null }): boolean {
+  return input.servingsHigh == null || input.servingsHigh >= input.servings;
+}
+const servingsRangeMessage = {
+  message: 'The most it serves cannot be below the fewest.',
+  path: ['servingsHigh'],
+};
+
 export const recipeRouter = router({
   // Create a recipe (+ children) for the active household.
   create: protectedProcedure
@@ -80,11 +91,13 @@ export const recipeRouter = router({
     // `rating`: the household's verdict, which only a Markdown import (D52) brings with it. On
     // create only: `update` is the form's full state, and the form does not hold the stars.
     .input(
-      z.object({
-        ...recipeFields,
-        importDraftId: z.string().uuid().optional(),
-        rating: z.number().int().min(1).max(5).nullable().optional(),
-      }),
+      z
+        .object({
+          ...recipeFields,
+          importDraftId: z.string().uuid().optional(),
+          rating: z.number().int().min(1).max(5).nullable().optional(),
+        })
+        .refine(servingsRangeRises, servingsRangeMessage),
     )
     .mutation(({ ctx, input }) => createRecipe(ctx.householdId, input)),
 
@@ -96,7 +109,11 @@ export const recipeRouter = router({
 
   // Replace a recipe's full state. Returns null when the id isn't in the household.
   update: protectedProcedure
-    .input(z.object({ id: z.string().uuid(), ...recipeFields }))
+    .input(
+      z
+        .object({ id: z.string().uuid(), ...recipeFields })
+        .refine(servingsRangeRises, servingsRangeMessage),
+    )
     .mutation(({ ctx, input }) => {
       const { id, ...rest } = input;
       return updateRecipe(ctx.householdId, id, rest);

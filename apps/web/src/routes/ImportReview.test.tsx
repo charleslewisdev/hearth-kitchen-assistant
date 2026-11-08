@@ -46,6 +46,7 @@ function makeDraft(over: Partial<RecipeDraft> = {}): RecipeDraft {
   return {
     title: { value: 'Best Banana Bread', confidence: 'high', raw: 'Best Banana Bread' },
     servings: { value: 10, confidence: 'high', raw: '1 loaf, 10 serving(s)' },
+    servingsHigh: null,
     mealTypes: { value: ['dessert'], confidence: 'high', raw: 'Quick Breads' },
     tags: { value: ['Breads'], confidence: 'high', raw: 'Breads,Fruit' },
     ingredientLines: {
@@ -205,6 +206,7 @@ describe('saving', () => {
     expect(mutateAsync).toHaveBeenCalledWith({
       title: 'Banana bread',
       servings: 10,
+      servingsHigh: null,
       mealTypes: ['dessert'],
       tags: ['Breads'],
       ingredientLines: ['1/2 cup butter, softened', '1 cup sugar'],
@@ -215,6 +217,35 @@ describe('saving', () => {
       cookMinutes: null,
       sourceUrl: 'https://www.food.com/recipe/best-banana-bread-2886',
     });
+  });
+
+  it('keeps a servings range the source gave, and saves the one the cook leaves (D53)', async () => {
+    renderReview(
+      makeDraft({
+        servings: { value: 4, confidence: 'high', raw: 'Serves 4-6' },
+        servingsHigh: 6,
+      }),
+    );
+    const upTo = screen.getByLabelText(/up to/i);
+    expect(upTo).toHaveValue(6);
+    fireEvent.change(upTo, { target: { value: '8' } });
+    fireEvent.click(screen.getByRole('button', { name: /save recipe/i }));
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
+    expect(mutateAsync.mock.calls[0]?.[0]).toMatchObject({ servings: 4, servingsHigh: 8 });
+  });
+
+  it('says so when the servings are raised past the range, and saves none', async () => {
+    renderReview(
+      makeDraft({
+        servings: { value: 4, confidence: 'high', raw: 'Serves 4-6' },
+        servingsHigh: 6,
+      }),
+    );
+    fireEvent.change(screen.getByLabelText(/servings/i), { target: { value: '6' } });
+    expect(screen.getByText(/up to has to be more than 6/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /save recipe/i }));
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
+    expect(mutateAsync.mock.calls[0]?.[0]).toMatchObject({ servings: 6, servingsHigh: null });
   });
 
   it("links a photo or PDF import's kept draft to the saved recipe", async () => {
@@ -533,6 +564,8 @@ describe('a Markdown file exported from Hearth', () => {
     expect(mutateAsync).toHaveBeenCalledWith({
       title: 'Barley Pilaf',
       servings: 4,
+      // The Markdown format has no servings range yet, so the review sends none.
+      servingsHigh: null,
       mealTypes: ['side'],
       tags: ['grains', 'make ahead'],
       ingredientLines: ['1 cup pearl barley', '2 cups stock [[House Stock]]'],

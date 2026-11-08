@@ -13,6 +13,7 @@ import { StarRating } from './StarRating';
 import { fileUrl } from '../lib/photo-upload';
 import styles from './RecipeView.module.css';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
+import { servingsText } from '../lib/servings';
 
 type Pane = 'ingredients' | 'steps';
 
@@ -206,7 +207,7 @@ export function RecipeView() {
             <span className={styles.servingsText}>
               <span className={styles.statLabel}>Serves</span>
               <span className={styles.statValue} aria-label="Servings">
-                {servings}
+                {servingsText(servings, recipe)}
               </span>
             </span>
             <button
