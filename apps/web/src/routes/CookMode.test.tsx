@@ -367,6 +367,28 @@ describe('CookMode', () => {
     expect(within(sheet).getByText(/8 servings/)).toBeInTheDocument();
   });
 
+  it('peeks at a range, both ends, and the servings range when not scaled (D53)', () => {
+    const ranged = makeRecipe({ servingsHigh: 6 });
+    ranged.ingredients[1] = { ...ranged.ingredients[1]!, quantityHigh: 3 } as never;
+    mockRecipe(ranged);
+    renderCook('/recipes/e2e-soup/cook');
+    fireEvent.click(screen.getByRole('button', { name: 'Ingredients' }));
+    const sheet = screen.getByRole('dialog');
+    expect(within(sheet).getByText('2–3 cups')).toBeInTheDocument();
+    expect(within(sheet).getByText(/4–6 servings/)).toBeInTheDocument();
+  });
+
+  it('scales both ends of a range from the low end of the servings', () => {
+    const ranged = makeRecipe({ servingsHigh: 6 });
+    ranged.ingredients[1] = { ...ranged.ingredients[1]!, quantityHigh: 3 } as never;
+    mockRecipe(ranged);
+    renderCook('/recipes/e2e-soup/cook?servings=8');
+    fireEvent.click(screen.getByRole('button', { name: 'Ingredients' }));
+    const sheet = screen.getByRole('dialog');
+    expect(within(sheet).getByText('4–6 cups')).toBeInTheDocument();
+    expect(within(sheet).getByText(/8 servings/)).toBeInTheDocument();
+  });
+
   it('peeks in grams when the recipe prints them and the cook reads metric', () => {
     localStorage.setItem('hearth.measureSystem', 'metric');
     const recipe = makeRecipe();

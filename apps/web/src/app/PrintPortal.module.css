@@ -1,0 +1,43 @@
+/* PrintPortal.module.css — the paper sheet both Print buttons print, and its shared type. */
+.sheet {
+  display: none;
+}
+
+/*
+  Paper is always white, so the sheet is black on white in either theme; the tokens follow the
+  screen's theme and would print a dark page for a cook in dark mode.
+*/
+@media print {
+  :global(body[data-printing]) > :not([data-print-sheet]) {
+    display: none !important;
+  }
+
+  :global(body[data-printing]) {
+    background: white;
+  }
+
+  .sheet {
+    display: block;
+    color: black;
+    font-size: 12pt;
+    line-height: 1.4;
+  }
+
+  .title {
+    font-family: var(--font-display);
+    font-size: 24pt;
+    margin: 0 0 4pt;
+  }
+
+  .meta {
+    margin: 0 0 10pt;
+    font-size: 10pt;
+  }
+
+  .heading {
+    font-family: var(--font-display);
+    font-size: 14pt;
+    margin: 12pt 0 6pt;
+    break-after: avoid;
+  }
+}

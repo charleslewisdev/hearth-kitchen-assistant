@@ -48,6 +48,9 @@ const TOO_LARGE = {
   image: 'That photo is too large to import. Take it again at a smaller size.',
 } as const;
 
+const MARKDOWN_TOO_LONG = 'That file is too long to import. Hearth reads one recipe per file.';
+const MARKDOWN_EMPTY = 'There is nothing in that file.';
+
 const TOO_MANY_PHOTOS = `Choose up to ${MAX_IMAGES_PER_IMPORT} photos for one recipe.`;
 const PHOTOS_TOO_LARGE = 'Those photos are too large together. Try fewer, or retake them smaller.';
 
@@ -88,6 +91,16 @@ interface ChosenPage {
 }
 
 let nextPageId = 0;
+
+/** A file's text, as UTF-8. FileReader, as `toBase64` uses, rather than `Blob.text()`. */
+function readText(file: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error('the file could not be read'));
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+    reader.readAsText(file, 'utf-8');
+  });
+}
 
 /**
  * A small preview of one page, so the cook can tell the pages apart by more than a file name.
@@ -188,6 +201,32 @@ export function Import() {
       }
       setSourceFiles({ kind: 'pdf', file });
       fromPdf.mutate({ fileBase64: await toBase64(file) });
+    } catch {
+      setFileProblem('That file could not be read. Try choosing it again.');
+    } finally {
+      setReading(false);
+    }
+  }
+
+  /**
+   * A Markdown file, read here and sent as the text it holds: a Hearth export (D52) is text, so
+   * it takes the paste's own procedure and its cap, and a file and a paste are one path.
+   */
+  async function importMarkdown(file: File | undefined) {
+    if (!file) return;
+    forget();
+    setReading(true);
+    try {
+      const contents = await readText(file);
+      if (contents.length > MAX_TEXT_LENGTH) {
+        setFileProblem(MARKDOWN_TOO_LONG);
+        return;
+      }
+      if (contents.trim() === '') {
+        setFileProblem(MARKDOWN_EMPTY);
+        return;
+      }
+      fromText.mutate({ text: contents });
     } catch {
       setFileProblem('That file could not be read. Try choosing it again.');
     } finally {
@@ -424,6 +463,22 @@ export function Import() {
               <span className={styles.tileLabel}>Text</span>
               <span className={styles.tileHint}>Paste it in</span>
             </button>
+          </li>
+          <li>
+            <label className={styles.tile}>
+              <span className={styles.tileLabel}>Markdown</span>
+              <span className={styles.tileHint}>A recipe exported from Hearth</span>
+              <input
+                type="file"
+                className={styles.fileInput}
+                accept=".md,.markdown,text/markdown,text/plain"
+                disabled={busy}
+                onChange={(e) => {
+                  void importMarkdown(e.target.files?.[0]);
+                  e.target.value = '';
+                }}
+              />
+            </label>
           </li>
           <li>
             <Link to="/recipes/new" className={styles.tile}>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { PrintPortal } from '../app/PrintPortal';
+import paper from '../app/PrintPortal.module.css';
 import { fileUrl } from '../lib/photo-upload';
 import {
   byPosition,
@@ -102,8 +103,7 @@ export function ShareButtons({
 
 /**
  * The recipe laid out for paper: title, photo, numbers, then every ingredient and every step,
- * which the screen shows one pane at a time. Hidden on screen. Rendered straight into `<body>`,
- * so the print stylesheet can hide everything else there, app chrome included, in one rule.
+ * which the screen shows one pane at a time. Hidden on screen; see `PrintPortal`.
  */
 export function PrintSheet({
   recipe,
@@ -114,14 +114,8 @@ export function PrintSheet({
   view: ShareView;
   coverFileId: string | null;
 }) {
-  // The print stylesheet hides the rest of <body> only while this sheet is mounted, so printing
-  // any other screen, such as the shopping list, still prints that screen.
-  useEffect(() => {
-    document.body.setAttribute('data-printing-recipe', '');
-    return () => document.body.removeAttribute('data-printing-recipe');
-  }, []);
-  return createPortal(
-    <article className={styles.sheet} data-print-sheet="" aria-hidden="true">
+  return (
+    <PrintPortal>
       <PrintedRecipe recipe={recipe} view={view} coverFileId={coverFileId} main />
       {/* The recipes its lines are made from, each at its own servings, after a rule. */}
       {(recipe.linkedRecipes ?? []).map((linked) => (
@@ -133,8 +127,7 @@ export function PrintSheet({
           />
         </section>
       ))}
-    </article>,
-    document.body,
+    </PrintPortal>
   );
 }
 
@@ -155,13 +148,15 @@ function PrintedRecipe({
   const source = sourceLine(recipe);
   return (
     <>
-      <Title className={styles.title}>{recipe.title}</Title>
-      <p className={styles.meta}>{recipeMeta(recipe, view)}</p>
+      <Title className={main ? paper.title : `${paper.title} ${styles.linkedTitle}`}>
+        {recipe.title}
+      </Title>
+      <p className={paper.meta}>{recipeMeta(recipe, view)}</p>
       {coverFileId && <img className={styles.cover} src={fileUrl(coverFileId, 'full')} alt="" />}
       {recipe.description && <p className={styles.description}>{recipe.description}</p>}
       {recipe.ingredients.length > 0 && (
         <section>
-          <Heading className={styles.heading}>Ingredients</Heading>
+          <Heading className={paper.heading}>Ingredients</Heading>
           <ul className={styles.ingredients}>
             {byPosition(recipe.ingredients).map((ing) => (
               <li key={ing.id}>{ingredientText(ing, recipe.servings, view)}</li>
@@ -171,7 +166,7 @@ function PrintedRecipe({
       )}
       {recipe.steps.length > 0 && (
         <section>
-          <Heading className={styles.heading}>Steps</Heading>
+          <Heading className={paper.heading}>Steps</Heading>
           <ol className={styles.steps}>
             {byPosition(recipe.steps).map((step) => (
               <li key={step.id}>{step.text}</li>

@@ -382,6 +382,49 @@ describe('how many it serves', () => {
     expect(withYield(line).servings.value).toBe(expected);
   });
 
+  it.each([
+    ['Serves 4 to 6', 4, 6],
+    ['Serves 4-6', 4, 6],
+    ['4–6 servings', 4, 6],
+    ['Yield: 6 to 8 servings', 6, 8],
+    ['Makes about 12 - 16', 12, 16],
+  ])('keeps both ends of %s', (line, low, high) => {
+    const draft = withYield(line);
+    expect(draft.servings.value).toBe(low);
+    expect(draft.servingsHigh).toBe(high);
+    expect(draft.servings.raw).toBe(line);
+  });
+
+  it('has no high end for one count, or a range that does not rise', () => {
+    expect(withYield('Serves 6').servingsHigh).toBeNull();
+    expect(withYield('Serves 6-4').servingsHigh).toBeNull();
+    expect(withYield('Serves 8 - Prep 10 minutes').servingsHigh).toBeNull();
+    // The 9 of a pan size is not a serving count.
+    expect(withYield('Makes 1 - 9x13 pan').servingsHigh).toBeNull();
+  });
+
+  it('does not take the end of a range as the whole count', () => {
+    // Before ranges were read, "4-6 servings" was 6: the pattern started at the 6.
+    expect(withYield('4-6 servings').servings.value).toBe(4);
+  });
+
+  it('reads a servings range in linear time over hostile runs', () => {
+    const hostile = [
+      `${'1'.repeat(60_000)}-${'2'.repeat(60_000)} servings`,
+      `Serves 4${' '.repeat(60_000)}to 6`,
+      `4${' '.repeat(60_000)}to 6 servings`,
+      '1-2 '.repeat(20_000),
+      `serves${' '.repeat(60_000)}4`,
+    ];
+    for (const line of hostile) {
+      const started = Date.now();
+      draftFromText(`Soup\n${line}\n\n2 cups stock\n1 tsp salt\n1 onion\n\nSimmer.`, {
+        kind: PASTED,
+      });
+      expect(Date.now() - started).toBeLessThan(500);
+    }
+  });
+
   it('falls back to 1 when nothing says, and keeps raw empty rather than inventing a source', () => {
     const draft = at('Cookies\n\n2 cups flour\n1 cup sugar\n2 eggs\n\nBake them.');
     expect(draft.servings.value).toBe(1);
@@ -873,9 +916,13 @@ tomatoes to add more flavor.`;
   });
 
   it('leaves a paste with no blank lines in its list to the ordinary wrap rule', () => {
-    // No blank lines, so nothing says "red peppers, drained" is a wrap and not a food.
-    const pasted = at('Dip\n1 jar roasted\nred peppers, drained\n1 can tomatoes\n1 cup almonds');
+    // No blank lines, so nothing says "salt, to taste" is a wrap and not a food.
+    const pasted = at('Dip\n1 jar roasted peppers\nsalt, to taste\n1 can tomatoes\n1 cup almonds');
     expect(pasted.ingredientLines.value).toHaveLength(4);
+    // A line cut off on a participle is joined by the ordinary rule now (issue #8): "roasted" on a
+    // line with no comma is still in front of its food.
+    const cut = at('Dip\n1 jar roasted\npeppers, drained\n1 can tomatoes\n1 cup almonds');
+    expect(cut.ingredientLines.value[0]).toBe('1 jar roasted peppers, drained');
   });
 
   it('reads the main recipe, not the sub-recipe under it that is one line longer', () => {
@@ -911,5 +958,147 @@ Instructions
 e Roast the pork.
 ¢ Pour 1 ladle of the liquid over it.`);
     expect(page.steps.value).toEqual(['Roast the pork.', 'Pour 1 ladle of the liquid over it.']);
+  });
+});
+
+describe('an ingredient line cut off before it ends', () => {
+  /*
+    A narrow column wraps an ingredient wherever the margin falls, and the piece on the next line
+    read as an ingredient of its own: "tomatoes, drained and thinly" under "1 can whole", then
+    "sliced" under that. The rule joins a lower-case next line when the line above has no natural
+    end AND the next line leads with no amount. Both halves are tested here, each way round.
+  */
+  const list = (lines: string): string[] =>
+    at(
+      `Supper\n${lines}\n1 cup rice\n2 cups stock\n\nCook it all together.`,
+    ).ingredientLines.value.slice(0, -2);
+
+  it('joins a line cut off after a coordinated adverb, over three lines (issue #8)', () => {
+    expect(list('1 (14-ounce) can whole\ntomatoes, drained and thinly\nsliced')).toEqual([
+      '1 (14-ounce) can whole tomatoes, drained and thinly sliced',
+    ]);
+  });
+
+  it('joins a line cut off after an adverb with nothing before it to finish', () => {
+    expect(list('2 tablespoons finely\nchopped parsley')).toEqual([
+      '2 tablespoons finely chopped parsley',
+    ]);
+  });
+
+  it('joins a line cut off after an article', () => {
+    expect(list('1 tablespoon juice from a\nlemon')).toEqual(['1 tablespoon juice from a lemon']);
+    expect(list('1 teaspoon zest from the\nlime')).toEqual(['1 teaspoon zest from the lime']);
+  });
+
+  it('joins a line whose amount is followed only by participles and sizes', () => {
+    expect(list('1 jar roasted\npeppers, drained\n1 cup ground\nbeef')).toEqual([
+      '1 jar roasted peppers, drained',
+      '1 cup ground beef',
+    ]);
+  });
+
+  it('does not join a staple under a line that ends on a participle after its food', () => {
+    // A paste writes "2 eggs beaten" as often as "2 eggs, beaten"; the line is complete either way.
+    expect(list('2 eggs beaten\nsalt and pepper')).toEqual(['2 eggs beaten', 'salt and pepper']);
+    expect(list('1 onion diced\nsalt')).toEqual(['1 onion diced', 'salt']);
+    expect(list('1 cup flour sifted\nkosher salt')).toEqual(['1 cup flour sifted', 'kosher salt']);
+    // The cost: shape cannot tell "Greek" from a food, so this wrap stays two lines.
+    expect(list('¼ cup Greek marinated\nartichokes, drained')).toEqual([
+      '¼ cup Greek marinated',
+      'artichokes, drained',
+    ]);
+  });
+
+  it('joins a line that has an amount and no food yet', () => {
+    expect(list('2 large\neggs, beaten\n1 (15-ounce) can\nchickpeas, rinsed')).toEqual([
+      '2 large eggs, beaten',
+      '1 (15-ounce) can chickpeas, rinsed',
+    ]);
+  });
+
+  it('keeps "shredded" in the food name once the line is joined', () => {
+    const [line] = list('1 bag shredded\nmozzarella');
+    expect(line).toBe('1 bag shredded mozzarella');
+    expect(parseIngredientLine(line!).foodName).toBe('shredded mozzarella');
+  });
+
+  it('does not join a staple under a line that ends on its food', () => {
+    expect(list('½ cup peas\nsalt and pepper')).toEqual(['½ cup peas', 'salt and pepper']);
+  });
+
+  it('does not join a staple under a line that ends on a prep word after a comma', () => {
+    expect(list('1 onion, peeled and chopped\nsalt')).toEqual([
+      '1 onion, peeled and chopped',
+      'salt',
+    ]);
+    expect(list('1 cup walnuts, toasted\nflaky salt')).toEqual([
+      '1 cup walnuts, toasted',
+      'flaky salt',
+    ]);
+    expect(list('1 teaspoon pepper, freshly ground\nkosher salt')).toEqual([
+      '1 teaspoon pepper, freshly ground',
+      'kosher salt',
+    ]);
+  });
+
+  it('does not join a staple under a line that ends on an adverb after its participle', () => {
+    expect(list('1 pound chicken, sliced thinly\nsalt and pepper to taste')).toEqual([
+      '1 pound chicken, sliced thinly',
+      'salt and pepper to taste',
+    ]);
+  });
+
+  it('does not join a next line that leads with an amount, even under a cut-off line', () => {
+    expect(list('1 (14-ounce) can whole\npinch of sugar')).toEqual([
+      '1 (14-ounce) can whole',
+      'pinch of sugar',
+    ]);
+    expect(list('2 tablespoons finely\na handful of mint')).toEqual([
+      '2 tablespoons finely',
+      'a handful of mint',
+    ]);
+    expect(list('3 tablespoons thinly\ncup chopped chives')).toEqual([
+      '3 tablespoons thinly',
+      'cup chopped chives',
+    ]);
+    expect(list('1 cup of the\none onion')).toEqual(['1 cup of the', 'one onion']);
+  });
+
+  it('does not join a next line that starts with a capital', () => {
+    expect(list('2 tablespoons finely\nParsley, to garnish')).toEqual([
+      '2 tablespoons finely',
+      'Parsley, to garnish',
+    ]);
+  });
+
+  it.each(['text', 'pdf', 'image'] as const)('joins the same way for a %s import', (kind) => {
+    const draft = draftFromText(
+      'Supper\n1 (14-ounce) can whole\ntomatoes, drained and thinly\nsliced\n2 tablespoons finely\nchopped parsley\n½ cup peas\nsalt and pepper\n\nCook it.',
+      { kind },
+    );
+    expect(draft?.ingredientLines.value).toEqual([
+      '1 (14-ounce) can whole tomatoes, drained and thinly sliced',
+      '2 tablespoons finely chopped parsley',
+      '½ cup peas',
+      'salt and pepper',
+    ]);
+  });
+
+  it('stays linear on long runs of what the rule looks at', () => {
+    const runs = [
+      `1 cup ${'thinly '.repeat(14_000)}`,
+      `1 cup ${'a'.repeat(90_000)}`,
+      `1 can whole\n${'sliced and thinly\n'.repeat(5_000)}`,
+      `2 large\n${'b'.repeat(90_000)}`,
+      `1 cup ${'marinated '.repeat(9_000)}\nartichokes`,
+      `1 ${'can '.repeat(20_000)}\nbeans`,
+    ];
+    for (const run of runs) {
+      const text = `Title\n${run}\n2 cups flour\n1 cup sugar\n3 eggs\n\nMix it.`;
+      expect(text.length).toBeLessThan(MAX_TEXT_LENGTH);
+      const started = performance.now();
+      draftFromText(text, { kind: PASTED });
+      expect(performance.now() - started).toBeLessThan(500);
+    }
   });
 });

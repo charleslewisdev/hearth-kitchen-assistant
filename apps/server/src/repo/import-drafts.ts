@@ -52,6 +52,10 @@ export async function keepImportDraft(
         titleConfidence: draft.title.confidence,
         titleRaw: noNulOrNull(draft.title.raw),
         servings: draft.servings.value,
+        servingsHigh:
+          draft.servingsHigh !== null && draft.servingsHigh > draft.servings.value
+            ? draft.servingsHigh
+            : null,
         servingsConfidence: draft.servings.confidence,
         servingsRaw: noNulOrNull(draft.servings.raw),
         ingredientsConfidence: draft.ingredientLines.confidence,

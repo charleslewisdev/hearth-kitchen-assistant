@@ -37,3 +37,13 @@ export function itemMergeKey(item: MergeableItem): string | null {
   if (item.foodId == null || item.quantity == null) return null;
   return `${item.foodId}::${item.unit ?? ''}`;
 }
+
+/**
+ * The one amount a shopping list buys for an amount that may be a range: the high end, since one
+ * clove too many costs less than a trip back to the shop for the one that was short (D53). The
+ * list aggregates and rounds this single number like any other.
+ */
+export function quantityToBuy(quantity: number | null, quantityHigh: number | null): number | null {
+  if (quantity === null) return null;
+  return quantityHigh ?? quantity;
+}

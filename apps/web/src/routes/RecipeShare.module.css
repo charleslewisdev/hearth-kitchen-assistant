@@ -52,39 +52,10 @@
   color: var(--color-leftover-text);
 }
 
-.sheet {
-  display: none;
-}
-
-/*
-  Paper is always white, so the sheet is black on white in either theme; the tokens follow the
-  screen's theme and would print a dark page for a cook in dark mode.
-*/
+/* The sheet itself, and its title, numbers and headings, are PrintPortal.module.css. */
 @media print {
-  :global(body[data-printing-recipe]) > :not([data-print-sheet]) {
-    display: none !important;
-  }
-
-  :global(body[data-printing-recipe]) {
-    background: white;
-  }
-
-  .sheet {
-    display: block;
-    color: black;
-    font-size: 12pt;
-    line-height: 1.4;
-  }
-
-  .title {
-    font-family: var(--font-display);
-    font-size: 24pt;
-    margin: 0 0 4pt;
-  }
-
-  .meta,
   .source {
-    margin: 0 0 10pt;
+    margin: 14pt 0 10pt;
     font-size: 10pt;
   }
 
@@ -99,13 +70,6 @@
   .description {
     margin: 0 0 12pt;
     font-style: italic;
-  }
-
-  .heading {
-    font-family: var(--font-display);
-    font-size: 14pt;
-    margin: 12pt 0 6pt;
-    break-after: avoid;
   }
 
   .ingredients {
@@ -129,10 +93,6 @@
     margin-top: 6pt;
   }
 
-  .source {
-    margin-top: 14pt;
-  }
-
   /* A recipe the main one is made from, after a rule. */
   .linked {
     margin-top: 18pt;
@@ -140,7 +100,7 @@
     border-top: 1pt solid black;
   }
 
-  .linked .title {
+  .linked .linkedTitle {
     font-size: 18pt;
     break-after: avoid;
   }

@@ -1,4 +1,9 @@
-import { formatQuantity, unitLabel, type parseIngredientLine } from '@hearth/shared';
+import {
+  formatQuantity,
+  formatQuantityRange,
+  unitLabel,
+  type parseIngredientLine,
+} from '@hearth/shared';
 
 /**
  * The "quantity · unit · food" line under an ingredient the cook is typing or reviewing.
@@ -12,8 +17,10 @@ import { formatQuantity, unitLabel, type parseIngredientLine } from '@hearth/sha
  */
 export function previewLabel(parsed: ReturnType<typeof parseIngredientLine>): string {
   const parts: string[] = [];
-  if (parsed.quantity != null) parts.push(formatQuantity(parsed.quantity, parsed.unit));
-  if (parsed.unit) parts.push(unitLabel(parsed.unit, parsed.quantity));
+  if (parsed.quantity != null) {
+    parts.push(formatQuantityRange(parsed.quantity, parsed.quantityHigh, parsed.unit));
+  }
+  if (parsed.unit) parts.push(unitLabel(parsed.unit, parsed.quantityHigh ?? parsed.quantity));
   // The second measure, so a cook sees "3 · cups · or 360 g · flour" and knows the grams were
   // understood as an amount rather than kept as a note.
   if (parsed.altQuantity !== undefined && parsed.altUnit !== undefined) {

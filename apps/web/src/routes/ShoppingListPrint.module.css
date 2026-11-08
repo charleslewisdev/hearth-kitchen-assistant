@@ -1,0 +1,59 @@
+/*
+  ShoppingListPrint.module.css — the shopping list on paper. Two columns, so a usual list fits one
+  A4 or Letter page; a department stays in one column where it fits.
+*/
+@media print {
+  .departments {
+    columns: 2;
+    column-gap: 24pt;
+  }
+
+  .department {
+    margin: 0 0 12pt;
+    break-inside: avoid;
+  }
+
+  /* Ruled under, and with no margin above, so a column starts level with the other. */
+  .department .heading {
+    margin: 0 0 4pt;
+    padding-bottom: 2pt;
+    border-bottom: 0.75pt solid black;
+  }
+
+  .items {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8pt;
+    padding: 3pt 0;
+    break-inside: avoid;
+  }
+
+  /* An empty square for a pen, level with the first line of a name that wraps. */
+  .box {
+    flex: none;
+    width: 9pt;
+    height: 9pt;
+    margin-top: 0.3em;
+    border: 1pt solid black;
+  }
+
+  .name {
+    flex: 1;
+  }
+
+  .note {
+    font-style: italic;
+  }
+
+  .amount {
+    flex: none;
+    font-weight: 700;
+    text-align: right;
+  }
+}

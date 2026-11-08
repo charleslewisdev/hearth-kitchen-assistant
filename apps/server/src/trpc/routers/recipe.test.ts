@@ -109,6 +109,24 @@ describe('recipe.list search parameters', () => {
     );
   });
 
+  it('refuses a servings range that runs downward, on create and update (D53)', async () => {
+    const caller = await callerFor(headers);
+    expect(
+      await codeOf(caller.recipe.create({ title: 'Chili', servings: 6, servingsHigh: 4 })),
+    ).toBe('BAD_REQUEST');
+    const { id } = await caller.recipe.create({ title: 'Chili', servings: 4, servingsHigh: 6 });
+    expect(
+      await codeOf(caller.recipe.update({ id, title: 'Chili', servings: 6, servingsHigh: 4 })),
+    ).toBe('BAD_REQUEST');
+    expect(
+      await codeOf(caller.recipe.create({ title: 'Chili', servings: 4, servingsHigh: 10_001 })),
+    ).toBe('BAD_REQUEST');
+    expect(await caller.recipe.get({ idOrSlug: id })).toMatchObject({
+      servings: 4,
+      servingsHigh: 6,
+    });
+  });
+
   it('refuses every search parameter to a caller with no session', async () => {
     const anonymous = appRouter.createCaller(testContext());
     expect(await codeOf(anonymous.recipe.list({ text: 'soup' }))).toBe('UNAUTHORIZED');

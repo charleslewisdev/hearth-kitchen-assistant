@@ -1,12 +1,14 @@
-import { and, eq, isNull, isNotNull, asc, sql } from 'drizzle-orm';
+import { and, eq, ne, isNull, isNotNull, asc, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import {
   scale,
   itemMergeKey,
   isNeverBought,
   parseIngredientLine,
+  quantityToBuy,
   type ScalingMode,
 } from '@hearth/shared';
+import type { ListAmount } from '@hearth/shared';
 import {
   shoppingList,
   shoppingListItem,
@@ -143,7 +145,8 @@ interface Candidate {
 }
 
 // Add a recipe's ingredients to the active list, scaled from the recipe's own
-// serving count to `servings`, aggregating where possible.
+// serving count to `servings`, aggregating where possible. A range buys its high end
+// (`quantityToBuy`, D53), and from there it aggregates like any single amount.
 //
 // Aggregation (design decision 3, via `itemMergeKey`): a candidate merges into an
 // existing RECIPE item on the same list when they share a non-null food, the same
@@ -198,6 +201,7 @@ async function recipeCandidates(
     .select({
       foodId: recipeIngredient.foodId,
       quantity: recipeIngredient.quantity,
+      quantityHigh: recipeIngredient.quantityHigh,
       unit: recipeIngredient.unit,
       note: recipeIngredient.note,
       rawText: recipeIngredient.rawText,
@@ -215,7 +219,11 @@ async function recipeCandidates(
   const servingsChange = { from: recipeRow.servings, to: servingsFor(recipeRow.servings) };
   const candidates: Candidate[] = [];
   for (const ing of ingredients) {
-    const quantity = ing.quantity == null ? null : Number(ing.quantity);
+    // The high end of a range ("2-3 cloves" buys 3), so the list never runs short (D53).
+    const quantity = quantityToBuy(
+      ing.quantity == null ? null : Number(ing.quantity),
+      ing.quantityHigh == null ? null : Number(ing.quantityHigh),
+    );
     const mode = ing.scalingMode as ScalingMode;
 
     const linked = ing.linkedRecipeId;
@@ -306,19 +314,15 @@ export async function addRecipeToListTx(
         )
         .limit(1);
 
-      if (existing) {
-        // Re-round the merged sum the SAME way `scale()` does (3 dp) so
-        // floating-point noise (e.g. 0.1 + 0.2) never leaks to the client.
-        const sum = Math.round((Number(existing.quantity) + candidate.quantity!) * 1000) / 1000;
-        await tx
-          .update(shoppingListItem)
-          .set({ quantity: String(sum) })
-          .where(
-            and(
-              eq(shoppingListItem.householdId, householdId),
-              eq(shoppingListItem.id, existing.id),
-            ),
-          );
+      // Added in the database rather than read-add-write, so an amount edited on another phone
+      // in the meantime is added to, not overwritten.
+      if (
+        existing &&
+        (await addToAmount(tx, householdId, existing.id, {
+          quantity: candidate.quantity!,
+          unit: candidate.unit,
+        }))
+      ) {
         continue;
       }
     }
@@ -340,6 +344,32 @@ export async function addRecipeToListTx(
   }
 }
 
+// Add `quantity` to an item's amount in one statement, re-rounded to 3 dp the way `scale()`
+// rounds, so floating-point noise (0.1 + 0.2) never reaches the client. Only while the item is
+// still unchecked with an amount in `unit`, which another phone may have changed since it was
+// read; returns whether it added.
+async function addToAmount(
+  tx: Tx,
+  householdId: string,
+  itemId: string,
+  { quantity, unit }: { quantity: number; unit: string | null },
+): Promise<boolean> {
+  const updated = await tx
+    .update(shoppingListItem)
+    .set({ quantity: sql`round(${shoppingListItem.quantity} + ${String(quantity)}::numeric, 3)` })
+    .where(
+      and(
+        eq(shoppingListItem.householdId, householdId),
+        eq(shoppingListItem.id, itemId),
+        eq(shoppingListItem.checked, false),
+        unit == null ? isNull(shoppingListItem.unit) : eq(shoppingListItem.unit, unit),
+        isNotNull(shoppingListItem.quantity),
+      ),
+    )
+    .returning({ id: shoppingListItem.id });
+  return updated.length > 0;
+}
+
 // Add a single hand-typed staple to the active list. The line is parsed for a
 // leading quantity/unit; the food name (if any) is resolved to a `food` row so the
 // item inherits a department. Manual items are NEVER aggregated — a hand-added
@@ -347,6 +377,8 @@ export async function addRecipeToListTx(
 export async function addManualItem(householdId: string, text: string): Promise<ShoppingItem> {
   return withHousehold(householdId, async (tx) => {
     const parsed = parseIngredientLine(text);
+    // "2-3 limes" typed onto the list is 3, as a recipe's range would be (D53).
+    const toBuy = quantityToBuy(parsed.quantity, parsed.quantityHigh ?? null);
     const foodRow =
       parsed.foodName === '' ? null : await findOrCreateFood(tx, householdId, parsed.foodName);
 
@@ -360,7 +392,7 @@ export async function addManualItem(householdId: string, text: string): Promise<
         listId: list.id,
         foodId: foodRow?.id ?? null,
         name: parsed.foodName || text,
-        quantity: parsed.quantity == null ? null : String(parsed.quantity),
+        quantity: toBuy == null ? null : String(toBuy),
         unit: parsed.unit,
         note: parsed.note,
         department: foodRow?.department ?? null,
@@ -409,6 +441,102 @@ export async function updateItem(
       .returning();
 
     return updated ? toItem(updated) : null;
+  });
+}
+
+const sameAmount = (row: { quantity: string | null; unit: string | null }, amount: ListAmount) =>
+  (row.quantity == null ? null : Number(row.quantity)) === amount.quantity &&
+  row.unit === amount.unit;
+
+// Set one item's amount and unit to what the cook typed (parsed by the caller), D54.
+//
+// - `seen` is the amount the cook was looking at when they started the edit. If the item no
+//   longer has it (another phone edited it, or a recipe was added onto it), the edit is refused
+//   with CONFLICT rather than overwriting that change. The row is locked while it is compared.
+// - Setting the amount the item already has succeeds without a change, so a resent request
+//   (a dropped signal) is harmless.
+// - The edit is the item's new amount: a later recipe add of the same food and unit adds to it.
+// - When the UNIT changes on an unchecked recipe item and another unchecked recipe item of the
+//   same food already has the new unit, the two merge, exactly as two recipe adds would: that
+//   row takes the sum and the edited row is deleted. Staples and checked rows never merge, as on
+//   add, and a change of amount alone never merges rows.
+// Returns the item that holds the amount afterwards (the merged-into row on a merge).
+export async function setItemAmount(
+  householdId: string,
+  itemId: string,
+  amount: ListAmount,
+  seen: ListAmount,
+): Promise<ShoppingItem> {
+  return withHousehold(householdId, async (tx) => {
+    const [row] = await tx
+      .select()
+      .from(shoppingListItem)
+      .where(and(eq(shoppingListItem.householdId, householdId), eq(shoppingListItem.id, itemId)))
+      .for('update');
+    if (!row) throw new TRPCError({ code: 'NOT_FOUND', message: 'Item not found' });
+    if (sameAmount(row, amount)) return toItem(row);
+    if (!sameAmount(row, seen)) {
+      throw new TRPCError({ code: 'CONFLICT', message: 'Item amount changed' });
+    }
+
+    const mergeable =
+      amount.unit !== row.unit &&
+      amount.quantity !== null &&
+      row.foodId !== null &&
+      row.source === 'recipe' &&
+      !row.checked;
+    if (mergeable) {
+      const [target] = await tx
+        .select({ id: shoppingListItem.id })
+        .from(shoppingListItem)
+        .where(
+          and(
+            eq(shoppingListItem.householdId, householdId),
+            eq(shoppingListItem.listId, row.listId),
+            ne(shoppingListItem.id, row.id),
+            eq(shoppingListItem.source, 'recipe'),
+            eq(shoppingListItem.checked, false),
+            eq(shoppingListItem.foodId, row.foodId!),
+            amount.unit == null
+              ? isNull(shoppingListItem.unit)
+              : eq(shoppingListItem.unit, amount.unit),
+            isNotNull(shoppingListItem.quantity),
+          ),
+        )
+        .orderBy(asc(shoppingListItem.position))
+        .limit(1)
+        .for('update');
+      if (
+        target &&
+        (await addToAmount(tx, householdId, target.id, {
+          quantity: amount.quantity!,
+          unit: amount.unit,
+        }))
+      ) {
+        await tx
+          .delete(shoppingListItem)
+          .where(
+            and(eq(shoppingListItem.householdId, householdId), eq(shoppingListItem.id, row.id)),
+          );
+        const [merged] = await tx
+          .select()
+          .from(shoppingListItem)
+          .where(
+            and(eq(shoppingListItem.householdId, householdId), eq(shoppingListItem.id, target.id)),
+          );
+        return toItem(merged!);
+      }
+    }
+
+    const [updated] = await tx
+      .update(shoppingListItem)
+      .set({
+        quantity: amount.quantity == null ? null : String(amount.quantity),
+        unit: amount.unit,
+      })
+      .where(and(eq(shoppingListItem.householdId, householdId), eq(shoppingListItem.id, row.id)))
+      .returning();
+    return toItem(updated!);
   });
 }
 

@@ -1,4 +1,5 @@
 import { backfillAltMeasures } from './repo/alt-measures';
+import { backfillQuantityRanges } from './repo/quantity-ranges';
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { join, sep } from 'node:path';
@@ -15,6 +16,7 @@ import {
   MAX_IMAGE_IMPORT_BYTES,
   MAX_PDF_BYTES,
   MAX_TRPC_BATCH,
+  recipeMarkdownFileName,
 } from '@hearth/shared';
 import { env } from './env';
 import { logger } from './log';
@@ -33,6 +35,8 @@ import { appRouter } from './trpc/routers';
 import { createContext } from './trpc/context';
 import { findRecipeFile } from './repo/recipe-files';
 import { readFileVariant } from './files';
+import { exportRecipes } from './repo/recipe-export';
+import { strToU8, zipSync } from 'fflate';
 
 /**
  * The shape an inbound request id has to have to be reused: a short token of characters that
@@ -496,6 +500,52 @@ export async function buildServer(opts: BuildServerOptions = {}): Promise<Fastif
   );
 
   /*
+    The household's recipes as Markdown (D52): one recipe as a `.md` file, or the whole library
+    as a zip with one file per recipe. Plain GETs rather than tRPC, so the browser downloads them
+    itself from a link, on a phone too, without the page holding the file in memory first.
+
+    Authorized exactly as the files route above is: the same `createContext`, the recipes read
+    inside the session's household (RLS behind it), and another household's id is a 404. Never
+    cached: an export is a snapshot the cook asked for now. The request line Fastify logs is the
+    path and ids only; nothing a recipe says is logged (D38).
+  */
+  app.get('/api/export/recipes.zip', async (req, reply) => {
+    const ctx = await createContext({ req });
+    if (!ctx.session || !ctx.householdId) return reply.code(401).send({ message: 'Sign in' });
+    const folder = `hearth-recipes-${new Date().toISOString().slice(0, 10)}`;
+    const used = new Set<string>();
+    const files: Record<string, Uint8Array> = {};
+    for (const exported of await exportRecipes(ctx.householdId)) {
+      files[recipeMarkdownFileName(exported.title, used)] = strToU8(exported.markdown);
+    }
+    reply
+      .header('content-type', 'application/zip')
+      .header('content-disposition', `attachment; filename="${folder}.zip"`)
+      .header('cache-control', 'private, no-store')
+      .header('x-content-type-options', 'nosniff');
+    return reply.send(Buffer.from(zipSync({ [folder]: files })));
+  });
+
+  app.get<{ Params: { id: string } }>('/api/export/recipes/:id', async (req, reply) => {
+    const { id } = req.params;
+    const ctx = await createContext({ req });
+    if (!ctx.session || !ctx.householdId) return reply.code(401).send({ message: 'Sign in' });
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+      return reply.code(404).send({ message: 'Not found' });
+    }
+    const [exported] = await exportRecipes(ctx.householdId, id);
+    if (!exported) return reply.code(404).send({ message: 'Not found' });
+    // The slug is ASCII letters, digits and hyphens, so it needs no quoting beyond the quotes.
+    const name = recipeMarkdownFileName(exported.title, new Set());
+    reply
+      .header('content-type', 'text/markdown; charset=utf-8')
+      .header('content-disposition', `attachment; filename="${name}"`)
+      .header('cache-control', 'private, no-store')
+      .header('x-content-type-options', 'nosniff');
+    return reply.send(exported.markdown);
+  });
+
+  /*
     tRPC, inside a scope whose routes accept an import upload.
 
     A photo or a PDF reaches `import.fromImage` / `import.fromPdf` as base64 inside the JSON
@@ -567,6 +617,8 @@ if (env.NODE_ENV !== 'test' && process.argv[1]?.endsWith('server.ts')) {
       await announceSetupToken(app.log);
       const filled = await backfillAltMeasures();
       if (filled > 0) app.log.info({ count: filled }, 'ingredient second measures filled in');
+      const ranged = await backfillQuantityRanges();
+      if (ranged > 0) app.log.info({ count: ranged }, 'ingredient quantity ranges filled in');
       await app.listen({ port: env.PORT, host: '0.0.0.0' });
     })
     .catch((err: unknown) => {

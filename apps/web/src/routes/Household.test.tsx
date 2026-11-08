@@ -173,6 +173,20 @@ describe('Household', () => {
     expect(screen.queryByRole('button', { name: 'Send invitation' })).not.toBeInTheDocument();
   });
 
+  it('offers every member the whole library as a zip of Markdown files', () => {
+    mockHousehold({
+      viewer: MEMBER_USER,
+      members: [
+        makeMember({ id: 'member-1', userId: OWNER_USER, name: 'Ada', role: 'owner' }),
+        makeMember({ id: 'member-2', userId: MEMBER_USER, name: 'Gran', role: 'member' }),
+      ],
+    });
+    render(<Household />);
+    const link = screen.getByRole('link', { name: 'Export all recipes' });
+    expect(link).toHaveAttribute('href', '/api/export/recipes.zip');
+    expect(link).toHaveAttribute('download');
+  });
+
   it('does not offer revoke or remove to a member', () => {
     mockHousehold({
       viewer: MEMBER_USER,

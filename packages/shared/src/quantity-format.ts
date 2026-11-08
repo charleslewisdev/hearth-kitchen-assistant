@@ -50,3 +50,19 @@ export function formatQuantity(quantity: number, unit?: string | null): string {
   }
   return decimal(quantity);
 }
+
+/**
+ * An amount that may be a range, the way a cook reads it: "2–3", "½–1", "4–6", or just "2" when
+ * there is no high end. An en dash with no spaces, as cookbooks print it. A range whose ends
+ * read the same once rounded (a tiny range scaled down) is shown as the one amount. D53.
+ */
+export function formatQuantityRange(
+  low: number,
+  high: number | null | undefined,
+  unit?: string | null,
+): string {
+  const lowText = formatQuantity(low, unit);
+  if (high == null) return lowText;
+  const highText = formatQuantity(high, unit);
+  return highText === lowText ? lowText : `${lowText}–${highText}`;
+}
