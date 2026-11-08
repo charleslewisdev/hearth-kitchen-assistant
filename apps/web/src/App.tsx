@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { QueryClientProvider } from '@tanstack/react-query';
+import { onlineManager, QueryClientProvider } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { BrowserRouter, Outlet, Routes, Route } from 'react-router-dom';
 import { trpc, trpcClient } from './lib/trpc';
@@ -21,6 +21,7 @@ import {
 } from './lib/offline';
 import { KeptSessionContext } from './lib/offline-context';
 import { decideGate } from './lib/session-gate';
+import { sendSignOut, signOutInFlight } from './lib/sign-out';
 import { AppShell } from './app/AppShell';
 import { ScrollToTopOnNavigate } from './app/ScrollToTopOnNavigate';
 import { SignIn } from './routes/SignIn';
@@ -44,6 +45,26 @@ import { Tags } from './routes/Tags';
  */
 export const SLOW_SESSION_CHECK_MS = 4_000;
 
+/** How often the app, open from the remembered session, asks the server again. */
+export const KEPT_RECHECK_MS = 30_000;
+
+/**
+ * The ids the gate reads, or null for anything else. A captive portal answering the session check
+ * with a 200 page of HTML hands the auth client a string, and reading `.user.id` off that would
+ * blank the app.
+ */
+function sessionIds(data: unknown): { userId: string; sessionId: string } | null {
+  const d = data as { user?: { id?: unknown }; session?: { id?: unknown } } | null;
+  const userId = d?.user?.id;
+  const sessionId = d?.session?.id;
+  return typeof userId === 'string' && typeof sessionId === 'string' ? { userId, sessionId } : null;
+}
+
+function householdId(data: unknown): { id: string } | null {
+  const id = (data as { id?: unknown } | null)?.id;
+  return typeof id === 'string' ? { id } : null;
+}
+
 /**
  * Who may see the app: a session, and a household to see it in.
  *
@@ -54,7 +75,12 @@ export const SLOW_SESSION_CHECK_MS = 4_000;
  * only an answer from the server signs anyone out (D56; the rules are in `lib/session-gate.ts`).
  */
 function SessionGate() {
-  const { data: session, isPending, error: sessionError } = authClient.useSession();
+  const {
+    data: session,
+    isPending,
+    error: sessionError,
+    refetch: refetchSession,
+  } = authClient.useSession();
   const activeOrg = authClient.useActiveOrganization();
   const knownRecord = useSyncExternalStore(subscribeKnownSession, knownSessionSnapshot, () => null);
   const known = useMemo(() => parseKnownSession(knownRecord), [knownRecord]);
@@ -81,7 +107,8 @@ function SessionGate() {
     who left) asks once and then stops rather than looping on the same empty answer.
   */
   const askedFor = useRef<string | null>(null);
-  const sessionId = session?.session.id;
+  const ids = sessionIds(session);
+  const sessionId = ids?.sessionId;
   useEffect(() => {
     if (sessionId === undefined || activeOrg.isPending || activeOrg.data) return;
     if (askedFor.current === sessionId) return;
@@ -90,14 +117,15 @@ function SessionGate() {
   }, [sessionId, activeOrg.isPending, activeOrg.data, activeOrg.refetch]);
 
   const view = decideGate({
-    session: session ? { userId: session.user.id, sessionId: session.session.id } : null,
+    session: ids,
     sessionPending: isPending,
     sessionError,
-    household: activeOrg.data ? { id: activeOrg.data.id } : null,
+    household: householdId(activeOrg.data),
     householdPending: activeOrg.isPending,
     householdError: activeOrg.error,
     known,
     signOutPending: pendingSignOut(),
+    signOutInFlight: signOutInFlight(),
     preferKnown: !navigator.onLine || slow || onKept.current,
   });
   const appSession = view.kind === 'app' ? view.session : null;
@@ -110,16 +138,28 @@ function SessionGate() {
   }, [offline]);
 
   /*
-    Back in signal: the auth client asks for the session again by itself, and not for the household,
-    so a household check that failed offline would hold the app on the kept session for good.
+    Open from the remembered session: changes to the list wait for a signal rather than being
+    sent into one too weak to carry them (the browser's online flag would let them through and
+    roll them back), and the server is asked again now and then, and whenever the browser says the
+    signal is back. The auth client asks again for the session by itself only on that event, and
+    never for the household, so without this a failed check would hold the app here for good.
   */
   const refetchHousehold = activeOrg.refetch;
   useEffect(() => {
+    onlineManager.setOnline(offline ? false : navigator.onLine);
     if (!offline) return;
-    const onOnline = () => void refetchHousehold();
-    window.addEventListener('online', onOnline);
-    return () => window.removeEventListener('online', onOnline);
-  }, [offline, refetchHousehold]);
+    const recheck = () => {
+      if (!navigator.onLine) return;
+      void refetchSession();
+      void refetchHousehold();
+    };
+    const timer = setInterval(recheck, KEPT_RECHECK_MS);
+    window.addEventListener('online', recheck);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('online', recheck);
+    };
+  }, [offline, refetchSession, refetchHousehold]);
 
   // Confirmed by the server: remember it, so the next start with no signal can open.
   const fresh = !offline && appSession ? JSON.stringify(appSession) : null;
@@ -135,15 +175,29 @@ function SessionGate() {
     setPendingSignOut(null);
   }, [forget]);
 
-  // A sign-out made with no signal, and the server has shown that session again: end it now.
-  const finished = useRef<string | null>(null);
+  /*
+    A sign-out made with no signal, and the server has shown that session again: end it now, and
+    keep trying while the request fails. Success empties the session, which leaves this state.
+  */
   useEffect(() => {
-    if (!finishing || !sessionId || finished.current === sessionId) return;
-    finished.current = sessionId;
-    void Promise.resolve(authClient.signOut()).then((result: unknown) => {
-      if (!(result as { error?: unknown } | undefined)?.error) setPendingSignOut(null);
-    });
-  }, [finishing, sessionId]);
+    if (!finishing) return;
+    let busy = false;
+    const attempt = () => {
+      if (busy || !navigator.onLine) return;
+      busy = true;
+      void sendSignOut().then((ended) => {
+        busy = false;
+        if (ended) setPendingSignOut(null);
+      });
+    };
+    attempt();
+    const timer = setInterval(attempt, KEPT_RECHECK_MS);
+    window.addEventListener('online', attempt);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('online', attempt);
+    };
+  }, [finishing]);
 
   switch (view.kind) {
     case 'wait':

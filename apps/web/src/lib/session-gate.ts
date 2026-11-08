@@ -5,8 +5,10 @@ import type { KnownSession } from './offline';
  *
  * The rule (D56): only the server can say someone is signed out. A session check that could not
  * reach it (no signal, a timeout, a proxy's 502) is not an answer, so a phone that has a known
- * session opens the app from it, offline. A 401, or a check that answers "nobody", is an answer:
- * the sign-in screen, and this phone forgets what it kept.
+ * session opens the app from it, offline. Better Auth's own answers are what count: "nobody" (a
+ * 200 with no session) or a 401 to the session check, and a 401 or 403 to the household check. Any
+ * other 4xx may be a proxy or a captive portal in front of the box, so it is not taken as a no.
+ * An answer means the sign-in screen (or onboarding), and this phone forgets what it kept.
  */
 export type GateView =
   /** Nothing yet: the first check is still out and there is nothing to show meanwhile. */
@@ -30,6 +32,8 @@ export type GateInput = {
   known: KnownSession | null;
   /** The session a sign-out made offline is still waiting to end on the server. */
   signOutPending: string | null;
+  /** A sign-out request from this page is still out; the gate does not send a second. */
+  signOutInFlight: boolean;
   /**
    * Whether to open from the known session while the first check is still out: the browser says
    * there is no network, the check has been slow, or the remembered session is already on screen.
@@ -37,22 +41,22 @@ export type GateInput = {
   preferKnown: boolean;
 };
 
-/**
- * Whether the server answered, with a refusal: any 4xx but a timeout or a rate limit. Anything
- * else (no response, a 5xx from a proxy whose box is down) says nothing about the session.
- */
-function isRefusal(error: unknown): boolean {
-  const status = (error as { status?: unknown } | null)?.status;
-  return (
-    typeof status === 'number' && status >= 400 && status < 500 && status !== 408 && status !== 429
-  );
+function statusOf(error: unknown): unknown {
+  return (error as { status?: unknown } | null)?.status;
 }
 
 export function decideGate(input: GateInput): GateView {
   const { session, known } = input;
 
   if (session) {
-    if (input.signOutPending === session.sessionId) return { kind: 'finish-sign-out' };
+    // The auth client keeps the last session it had when a later check fails: still this
+    // person, but not a fresh answer, so not one to remember or to send a sign-out on.
+    const stale = Boolean(input.sessionError);
+    if (input.signOutPending === session.sessionId) {
+      return stale || input.signOutInFlight
+        ? { kind: 'sign-in', forget: false }
+        : { kind: 'finish-sign-out' };
+    }
     if (input.household) {
       return {
         kind: 'app',
@@ -61,14 +65,15 @@ export function decideGate(input: GateInput): GateView {
           householdId: input.household.id,
           sessionId: session.sessionId,
         },
-        offline: false,
+        offline: stale,
       };
     }
     // The session answered and the household check did not, for a known pair: open offline.
     const mine = known?.userId === session.userId ? known : null;
     if (input.householdPending)
       return mine && input.preferKnown ? offlineApp(mine) : { kind: 'wait' };
-    if (input.householdError && !isRefusal(input.householdError)) {
+    const refused = [401, 403].includes(statusOf(input.householdError) as number);
+    if (input.householdError && !refused) {
       return mine ? offlineApp(mine) : { kind: 'wait' };
     }
     return { kind: 'onboarding' };
@@ -76,7 +81,7 @@ export function decideGate(input: GateInput): GateView {
 
   if (input.sessionPending)
     return known && input.preferKnown ? offlineApp(known) : { kind: 'wait' };
-  if (input.sessionError && !isRefusal(input.sessionError)) {
+  if (input.sessionError && statusOf(input.sessionError) !== 401) {
     // Unreachable. A sign-out still to be sent counts as signed out here.
     return known ? offlineApp(known) : { kind: 'sign-in', forget: false };
   }

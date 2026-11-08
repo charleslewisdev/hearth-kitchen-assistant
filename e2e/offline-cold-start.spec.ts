@@ -104,6 +104,39 @@ test('signing out removes this phone’s copy of the list', async ({ page, conte
   await expect(page.getByText('paper towels')).toHaveCount(0);
 });
 
+test('signing out with no signal leaves nothing of the list on the phone', async ({
+  page,
+  context,
+}) => {
+  await signIn(page);
+  await page.goto(`${PREVIEW_ORIGIN}/shop`);
+  await page.getByLabel('Add a staple').fill('rice cakes');
+  await page.getByRole('button', { name: 'Add', exact: true }).click();
+  await expect(page.getByRole('checkbox', { name: 'Check rice cakes' })).toBeEnabled();
+  await page.evaluate(() => navigator.serviceWorker.ready.then(() => undefined));
+
+  await context.setOffline(true);
+  await page.reload();
+  await page.getByRole('checkbox', { name: 'Check rice cakes' }).click();
+  await page.getByRole('link', { name: 'More' }).click();
+  await page.getByRole('button', { name: 'Sign out' }).click();
+
+  await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible();
+  const kept = await page.evaluate(() =>
+    Object.keys(localStorage).filter((k) => k.startsWith('hearth.')),
+  );
+  // The copy and the queued tick are gone; only the note to end the session on the server stays.
+  expect(kept).toEqual(['hearth.signOutPending']);
+
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible();
+  await expect(page.getByText('rice cakes')).toHaveCount(0);
+  /*
+    Not followed online here: the preview's origin is not one Better Auth trusts, so the sign-out
+    the gate then sends is refused for that reason alone. App.test.tsx covers it being sent.
+  */
+});
+
 test('a change queued offline is refused once the household is gone, and the copy goes', async ({
   page,
   context,
@@ -129,7 +162,9 @@ test('a change queued offline is refused once the household is gone, and the cop
   await revoke(null);
   try {
     await context.setOffline(false);
-    await expect(page.getByRole('heading', { name: /household/ })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /^(Name your household|You are not in a household yet)$/ }),
+    ).toBeVisible();
     await expect(page.getByText('oat milk')).toHaveCount(0);
     await expect
       .poll(() =>

@@ -175,7 +175,10 @@ export function ShoppingList() {
     return (
       <section className={styles.screen}>
         <h1 className={styles.title}>Shopping list</h1>
-        <p className={styles.status} role="status">
+        <p
+          className={query.fetchStatus === 'paused' ? styles.offline : styles.status}
+          role="status"
+        >
           {query.fetchStatus === 'paused'
             ? 'You’re offline, and this phone has no copy of your list yet. It will load when the connection comes back.'
             : 'Loading your list…'}
@@ -230,6 +233,13 @@ export function ShoppingList() {
         <p className={styles.offline} role="status">
           You’re offline. Showing your list from {keptListTime(query.dataUpdatedAt)}. Changes you
           make here will be saved when the connection comes back.
+        </p>
+      )}
+
+      {/* Online, but the last refresh failed: the list on screen may be behind. */}
+      {online && query.isError && (
+        <p className={styles.offline} role="status">
+          Can’t reach Hearth right now. Showing your list from {keptListTime(query.dataUpdatedAt)}.
         </p>
       )}
 

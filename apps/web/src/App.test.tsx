@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup, act } from '@testing-library/react';
+import { onlineManager } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { App } from './App';
 import { authClient } from './lib/auth';
@@ -9,6 +10,7 @@ import {
   rememberSession,
   setPendingSignOut,
 } from './lib/offline';
+import { signOut } from './lib/sign-out';
 
 // The gate is the whole subject here, so nothing below it needs a real tRPC client: the three
 // screens these tests reach (sign in, onboarding, accept invite) do not call one.
@@ -180,5 +182,45 @@ describe('App with no signal (D56)', () => {
     expect(screen.getByRole('heading', { name: 'Sign in to Hearth' })).toBeInTheDocument();
     expect(authClient.signOut).toHaveBeenCalledTimes(1);
     await vi.waitFor(() => expect(pendingSignOut()).toBeNull());
+  });
+
+  it('holds list changes while open from the remembered session', async () => {
+    rememberSession({ userId: 'user-1', householdId: 'org-1', sessionId: 'session-1' });
+    useSession.mockReturnValue({ ...offline, refetch: vi.fn() });
+    useActiveOrganization.mockReturnValue({ ...offline, refetch });
+
+    renderAt('/plan');
+    await screen.findByRole('heading', { name: 'Plan' });
+
+    // The browser may still say online on a signal too weak to use; the queue must not.
+    expect(onlineManager.isOnline()).toBe(false);
+    onlineManager.setOnline(true);
+  });
+
+  it('signs out with no signal: sign-in at once, nothing kept, and the session noted to end', async () => {
+    rememberSession({ userId: 'user-1', householdId: 'org-1', sessionId: 'session-1' });
+    localStorage.setItem('hearth.offline.cache', '{}');
+    // The auth client still holds the session, as it does when its sign-out request fails.
+    useSession.mockReturnValue({ ...session(), isPending: false });
+    useActiveOrganization.mockReturnValue(household({ id: 'org-1', name: 'The Bell Kitchen' }));
+    const authSignOut = authClient.signOut as unknown as Mock;
+    authSignOut.mockReset();
+    authSignOut.mockRejectedValue(new TypeError('Failed to fetch'));
+    const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    try {
+      renderAt('/plan');
+      expect(screen.getByRole('heading', { name: 'Plan' })).toBeInTheDocument();
+
+      await act(() => signOut());
+
+      expect(screen.getByRole('heading', { name: 'Sign in to Hearth' })).toBeInTheDocument();
+      expect(readKnownSession()).toBeNull();
+      expect(localStorage.getItem('hearth.offline.cache')).toBeNull();
+      expect(pendingSignOut()).toBe('session-1');
+      // Its own request only: the gate sends no second one while there is no signal.
+      expect(authSignOut).toHaveBeenCalledTimes(1);
+    } finally {
+      onLine.mockRestore();
+    }
   });
 });

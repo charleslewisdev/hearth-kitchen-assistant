@@ -14,6 +14,7 @@ function input(overrides: Partial<GateInput>): GateInput {
     householdError: null,
     known: null,
     signOutPending: null,
+    signOutInFlight: false,
     preferKnown: false,
     ...overrides,
   };
@@ -42,8 +43,10 @@ describe('decideGate', () => {
       kind: 'sign-in',
       forget: true,
     });
-    // Too many requests is not a no.
-    expect(decideGate(input({ sessionError: { status: 429 }, known: KNOWN })).kind).toBe('app');
+    // Not Better Auth's no: a rate limit, or a proxy or captive portal in front of the box.
+    for (const status of [403, 404, 429]) {
+      expect(decideGate(input({ sessionError: { status }, known: KNOWN })).kind).toBe('app');
+    }
   });
 
   it('shows sign-in without forgetting when unreachable and nothing is known', () => {
@@ -100,5 +103,39 @@ describe('decideGate', () => {
         input({ session: { userId: 'u1', sessionId: 's2' }, household, signOutPending: 's1' }),
       ).kind,
     ).toBe('app');
+  });
+
+  it('does not send a sign-out on a session the auth client kept from before a failed check', () => {
+    const household = { id: 'h1' };
+    const session = { userId: 'u1', sessionId: 's1' };
+    expect(
+      decideGate(input({ session, household, signOutPending: 's1', sessionError: NETWORK })),
+    ).toEqual({ kind: 'sign-in', forget: false });
+    // Nor a second one while this page's own request is still out.
+    expect(
+      decideGate(input({ session, household, signOutPending: 's1', signOutInFlight: true })),
+    ).toEqual({ kind: 'sign-in', forget: false });
+  });
+
+  it('marks a kept session as offline, so it is not remembered as fresh', () => {
+    expect(
+      decideGate(
+        input({
+          session: { userId: 'u1', sessionId: 's1' },
+          household: { id: 'h1' },
+          sessionError: NETWORK,
+        }),
+      ),
+    ).toEqual({ kind: 'app', session: KNOWN, offline: true });
+  });
+
+  it('takes only 401 and 403 as a no from the household check', () => {
+    const session = { userId: 'u1', sessionId: 's1' };
+    expect(decideGate(input({ session, householdError: { status: 401 }, known: KNOWN })).kind).toBe(
+      'onboarding',
+    );
+    expect(decideGate(input({ session, householdError: { status: 404 }, known: KNOWN })).kind).toBe(
+      'app',
+    );
   });
 });

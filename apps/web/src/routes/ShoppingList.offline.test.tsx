@@ -61,11 +61,14 @@ describe('ShoppingList from the copy on this phone', () => {
   it('says when the list on screen is from, while offline', () => {
     useGetQuery.mockReturnValue({ data: { items: [MILK] }, dataUpdatedAt: FETCHED_AT });
     const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
-    renderList();
-    expect(screen.getByRole('status')).toHaveTextContent(
-      `Showing your list from ${keptListTime(FETCHED_AT).replaceAll('\u00a0', ' ')}`,
-    );
-    onLine.mockRestore();
+    try {
+      renderList();
+      expect(screen.getByRole('status')).toHaveTextContent(
+        `Showing your list from ${keptListTime(FETCHED_AT).replaceAll('\u00a0', ' ')}`,
+      );
+    } finally {
+      onLine.mockRestore();
+    }
   });
 
   it('says so too when the browser thinks it is online but the server could not be reached', () => {
@@ -79,11 +82,14 @@ describe('ShoppingList from the copy on this phone', () => {
       data: { items: [MILK] },
       dataUpdatedAt: FETCHED_AT,
       isError: true,
-      isRefetchError: true,
+      error: { data: { code: 'INTERNAL_SERVER_ERROR' } },
     });
-    renderList({ kept: true });
+    renderList();
     expect(screen.getByRole('checkbox', { name: 'Check Milk' })).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    // Said, though the phone is online: the list on screen may be behind. No promise to save.
+    expect(screen.getByRole('status')).toHaveTextContent('Can’t reach Hearth right now');
+    expect(screen.getByRole('status')).not.toHaveTextContent('will be saved');
   });
 
   it('does not keep showing a list the server refused', () => {
@@ -96,6 +102,16 @@ describe('ShoppingList from the copy on this phone', () => {
     renderList();
     expect(screen.queryByRole('checkbox', { name: 'Check Milk' })).not.toBeInTheDocument();
     expect(screen.getByRole('alert')).toBeInTheDocument();
+  });
+
+  it('does not keep showing a list once signed out on the server', () => {
+    useGetQuery.mockReturnValue({
+      data: { items: [MILK] },
+      isError: true,
+      error: { data: { code: 'UNAUTHORIZED' } },
+    });
+    renderList();
+    expect(screen.queryByRole('checkbox', { name: 'Check Milk' })).not.toBeInTheDocument();
   });
 
   it('says there is no copy yet rather than showing an empty list', () => {

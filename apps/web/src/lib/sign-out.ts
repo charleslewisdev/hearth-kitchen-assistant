@@ -11,17 +11,33 @@ import { forgetOfflineData, leaveScope, readKnownSession, setPendingSignOut } fr
  * it; if the request cannot get there, the session id is noted and the session gate ends it the next
  * time the server shows it.
  */
+let inFlight = false;
+
+/** Whether a sign-out request from this page is still out, so the gate does not send another. */
+export function signOutInFlight(): boolean {
+  return inFlight;
+}
+
 export async function signOut(): Promise<void> {
   const known = readKnownSession();
+  // Noted before the sweep, whose notice re-renders the gate: it must already see the sign-out.
+  if (known) setPendingSignOut(known.sessionId);
+  inFlight = true;
   leaveScope(queryClient);
   forgetOfflineData();
-  if (known) setPendingSignOut(known.sessionId);
-  let failed = true;
+  try {
+    if (await sendSignOut()) setPendingSignOut(null);
+  } finally {
+    inFlight = false;
+  }
+}
+
+/** Ask the server to end the session. True when it did; never throws. */
+export async function sendSignOut(): Promise<boolean> {
   try {
     const result: unknown = await authClient.signOut();
-    failed = Boolean((result as { error?: unknown } | undefined)?.error);
+    return !(result as { error?: unknown } | undefined)?.error;
   } catch {
-    failed = true;
+    return false;
   }
-  if (!failed) setPendingSignOut(null);
 }
