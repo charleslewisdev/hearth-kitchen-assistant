@@ -32,7 +32,7 @@ import styles from './ImportReview.module.css';
  *
  * Every source produces the SAME `RecipeDraft` - that is what makes this screen
  * source-agnostic - so reading the type off one procedure is not a claim that it belongs to
- * that procedure. `fromText`, `fromPdf` and `fromImage` all return it unchanged. If they ever
+ * that procedure. `fromText`, `fromPdf`, `fromDocx` and `fromImage` all return it unchanged. If they ever
  * do diverge, the fix is to widen this into a union rather than to go on pointing at the URL
  * one.
  *
@@ -58,6 +58,7 @@ type SourceKind = RecipeDraft['source']['kind'];
  */
 const SOURCE_HEADINGS: Record<SourceKind, string> = {
   url: 'What the page said',
+  docx: 'What the document said',
   text: 'What you pasted said',
   pdf: 'What the PDF said',
   image: 'What the photo said',
@@ -71,6 +72,7 @@ const SOURCE_HEADINGS: Record<SourceKind, string> = {
  */
 const SOURCE_NOUNS: Record<SourceKind, string> = {
   url: 'page',
+  docx: 'document',
   text: 'text',
   pdf: 'PDF',
   image: 'photo',

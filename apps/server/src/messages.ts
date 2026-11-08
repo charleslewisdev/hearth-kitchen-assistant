@@ -89,3 +89,11 @@ export const FOOD_NAME_TAKEN_MESSAGE =
  */
 export const TAG_NAME_TAKEN_MESSAGE =
   'Another tag already has that name. Merge the two instead, so the recipes share one tag.';
+
+/**
+ * What a cook is told about an old binary Word document, or a password-protected `.docx`, which
+ * is the same older container. The server says it about the bytes it received; the Import
+ * screen says it about a `.doc` file name before uploading anything.
+ */
+export const OLD_WORD_DOCUMENT_MESSAGE =
+  'Hearth can only read .docx files, and this is an older Word document (.doc) or a password-protected one. Open it in Word and save it as .docx, or copy the recipe and use Text.';

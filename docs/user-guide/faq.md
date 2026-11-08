@@ -67,8 +67,9 @@ message by source. In short:
 
 ### I cannot import a Word document
 
-Word files are not supported. Copy the text and use **Text**, or save the document as a PDF from
-Word and use **PDF**.
+Hearth reads `.docx` files on the **PDF or Word** tile. It cannot read the older `.doc` format or a
+password-protected document: open it in Word and save it as `.docx`, or copy the text and use
+**Text**. See [Word documents](importing.md#word-documents).
 
 ### How do I delete a recipe?
 

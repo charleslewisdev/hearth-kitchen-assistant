@@ -20,6 +20,15 @@
 export const MAX_PDF_BYTES = 6 * 1024 * 1024;
 
 /**
+ * The largest Word document (`.docx`) worth reading.
+ *
+ * The PDF's cap, for the same reasons: a document of text is tens of kilobytes, one with
+ * photographs in it a few megabytes, and it is unzipped in the server process. Sharing the
+ * number keeps `MAX_IMPORT_BODY_BYTES`, which is derived from the PDF and photo caps, true.
+ */
+export const MAX_DOCX_BYTES = MAX_PDF_BYTES;
+
+/**
  * The largest photograph worth reading.
  *
  * A 12 megapixel phone photo is 4 to 6MB as the camera writes it. The browser reduces one to

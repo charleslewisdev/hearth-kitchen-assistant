@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  draftFromDocx,
   draftFromHtml,
   draftFromImages,
   draftFromPdf,
@@ -9,6 +10,7 @@ import {
   MAX_URL_LENGTH,
 } from '@hearth/enrichment';
 import type {
+  DocxFailureReason,
   FetchFailureReason,
   FetchPageResult,
   ImageFailureReason,
@@ -17,6 +19,7 @@ import type {
 } from '@hearth/enrichment';
 import {
   base64Length,
+  MAX_DOCX_BYTES,
   MAX_IMAGE_BYTES,
   MAX_IMAGE_IMPORT_BYTES,
   MAX_IMAGES_PER_IMPORT,
@@ -25,11 +28,12 @@ import {
 } from '@hearth/shared';
 import { TRPCError } from '@trpc/server';
 import { keepFailedImport } from '../../import-failures';
+import { OLD_WORD_DOCUMENT_MESSAGE } from '../../messages';
 import { keepImportDraft, type ImportReading } from '../../repo/import-drafts';
 import { router, protectedProcedure } from '../trpc';
 
 /**
- * Importing a recipe from a link, a paste, a PDF or a photograph.
+ * Importing a recipe from a link, a paste, a PDF, a Word document or a photograph.
  *
  * This router does not write the recipe tables. It fetches, extracts, and hands back a
  * `RecipeDraft`; the review screen edits it and submits it through the existing `recipe.create`.
@@ -108,6 +112,24 @@ export const PDF_FAILURE_MESSAGES: Record<PdfFailureReason, string> = {
     'No recipe was found in that scan. A straight, sharp scan of just the recipe usually reads better.',
 };
 
+/**
+ * What a cook is told about a Word document that did not become a recipe.
+ *
+ * `old-format` is the one worth the most words: a Word 97-2003 `.doc` and a password-protected
+ * `.docx` are both the older container format, and the way through for either is the same.
+ */
+export const DOCX_FAILURE_MESSAGES: Record<DocxFailureReason, string> = {
+  'too-large': 'That document is too large to import. Try saving just the recipe in a new one.',
+  'old-format': OLD_WORD_DOCUMENT_MESSAGE,
+  malformed: 'Hearth could not read that Word document. It may be damaged, or not a .docx file.',
+  'too-much-content':
+    'There is far more text in that document than a recipe has. Try saving just the recipe in a new one.',
+  'timed-out':
+    'Reading that document took too long, so Hearth stopped. Try saving just the recipe.',
+  'no-recipe':
+    'No recipe was found in that document. An ingredient list with amounts on it is what Hearth looks for.',
+};
+
 /** What a cook is told about a photograph that did not become a recipe. */
 export const IMAGE_FAILURE_MESSAGES: Record<ImageFailureReason, string> = {
   'too-large': 'That photo is too large to import. Take it again at a smaller size.',
@@ -169,13 +191,13 @@ export const KEPT_REASONS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Keep a failed photo or PDF import for studying the parser (`import-failures.ts`). Best
+ * Keep a failed photo, PDF or Word import for studying the parser (`import-failures.ts`). Best
  * effort: the cook is told about the failure either way, and a full disk must not turn a
  * "no recipe found" into a 500.
  */
 async function keepForStudy(
   ctx: { householdId: string; log: { warn: (obj: object, msg: string) => void } },
-  kind: 'image' | 'pdf',
+  kind: 'image' | 'pdf' | 'docx',
   reason: string,
   files: Uint8Array[],
   text?: string,
@@ -292,6 +314,28 @@ export function createImportRouter(fetch: PageFetcher = fetchPage) {
           refuse(PDF_FAILURE_MESSAGES[result.reason]);
         }
         return keepDraft(ctx, result.draft, result.text, result.scanned ? 'pdf_ocr' : 'pdf_text');
+      }),
+
+    /**
+     * Read a recipe out of an uploaded Word document (`.docx`).
+     *
+     * Capped at the input like a PDF, and read by `draftFromDocx`, which unzips only the parts
+     * it needs against its own budget and refuses DTDs. The text is the document's own, read
+     * the same way every time, so like a paste it keeps no `import_draft` (D55); a document that
+     * fails is kept for study like a PDF that does.
+     */
+    fromDocx: protectedProcedure
+      .input(z.object({ fileBase64: z.string().min(1).max(base64Length(MAX_DOCX_BYTES)) }))
+      .mutation(async ({ ctx, input }): Promise<ImportedDraft> => {
+        const bytes = decodeUpload(input.fileBase64);
+        if (!bytes) refuse(UNREADABLE_UPLOAD_MESSAGE);
+
+        const result = draftFromDocx(bytes);
+        if (!result.ok) {
+          await keepForStudy(ctx, 'docx', result.reason, [bytes], result.text);
+          refuse(DOCX_FAILURE_MESSAGES[result.reason]);
+        }
+        return { ...result.draft, importDraftId: null };
       }),
 
     /**

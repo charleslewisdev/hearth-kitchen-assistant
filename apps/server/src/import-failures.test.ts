@@ -43,6 +43,22 @@ describe('keeping a failed import', () => {
     expect(readFileSync(join(dir, 'meta.json'), 'utf8')).not.toContain('weather');
   });
 
+  it('keeps a Word document as the .docx it arrived as', async () => {
+    const data = mkdtempSync(join(tmpdir(), 'hearth-failures-'));
+    const id = await keepFailedImport(
+      'hh_1',
+      { kind: 'docx', reason: 'malformed', files: [new Uint8Array([0x50, 0x4b])] },
+      new Date('2026-09-27T20:00:00Z'),
+      data,
+    );
+    const dir = join(data, 'import-failures', 'hh_1', id);
+    expect(readdirSync(dir).sort()).toEqual(['meta.json', 'page-1.docx']);
+    expect(JSON.parse(readFileSync(join(dir, 'meta.json'), 'utf8'))).toMatchObject({
+      kind: 'docx',
+      reason: 'malformed',
+    });
+  });
+
   it('writes no text.txt when nothing was read off the page', async () => {
     const data = mkdtempSync(join(tmpdir(), 'hearth-failures-'));
     const id = await keepFailedImport(
