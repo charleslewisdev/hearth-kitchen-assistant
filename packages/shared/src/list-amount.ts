@@ -36,13 +36,22 @@ export function parseListAmount(text: string): ListAmount | null {
 
   const parsed = parseIngredientLine(`${trimmed} ${STAND_IN_FOOD}`);
   if (parsed.foodName !== STAND_IN_FOOD || parsed.note !== null) return null;
-  // A range ("2-3 lb") buys its high end, as everything else on the list does (D53). The parser
-  // reports one only once quantity ranges ship (#25); until then this reads the low end.
+  // A range ("2-3 lb", "2 to 3") buys its high end, the rule quantity ranges (#25) bring to the
+  // rest of the list. Until the parser reports that high end it reads only the low one, and a
+  // list that silently buys 2 lb when the cook typed 2-3 is worse than asking again.
   const { quantityHigh } = parsed as { quantityHigh?: number };
+  if (quantityHigh === undefined && looksLikeRange(trimmed)) return null;
   const quantity = quantityHigh ?? parsed.quantity;
   if (quantity === null || !Number.isFinite(quantity)) return null;
   if (quantity <= 0 || quantity > MAX_LIST_QUANTITY) return null;
   return { quantity, unit: parsed.unit };
+}
+
+/** Whether an amount is written as a range: any dash, or the word "to" or "or". */
+function looksLikeRange(text: string): boolean {
+  if (text.includes('-') || text.includes('–')) return true;
+  const words = text.toLowerCase().split(' ');
+  return words.includes('to') || words.includes('or');
 }
 
 /**

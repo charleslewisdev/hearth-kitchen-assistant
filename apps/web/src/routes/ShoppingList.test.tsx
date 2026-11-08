@@ -424,4 +424,27 @@ describe('an amount edit shows at once, and says when another phone got there fi
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
     expect(screen.queryByRole('alert')).toBeNull();
   });
+
+  it('says nothing for an item that is gone, since the list will show it gone', async () => {
+    const cache = withCache([makeItem({ id: 'i1', name: 'eggs', quantity: 6, unit: null })]);
+    mockQuery([makeItem({ id: 'i1', name: 'eggs', quantity: 6, unit: null })]);
+    renderList();
+
+    const context = await act(() => options().onMutate(input));
+    act(() => options().onError({ data: { code: 'NOT_FOUND' } }, input, context));
+
+    expect(cache.current()?.items[0]).toMatchObject({ quantity: 6 });
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('says the amount may not have been saved when the connection drops mid-request', async () => {
+    withCache([makeItem({ id: 'i1', name: 'eggs', quantity: 6, unit: null })]);
+    mockQuery([makeItem({ id: 'i1', name: 'eggs', quantity: 6, unit: null })]);
+    renderList();
+
+    const context = await act(() => options().onMutate(input));
+    act(() => options().onError(new TypeError('Failed to fetch'), input, context));
+
+    expect(screen.getByRole('alert')).toHaveTextContent('may not have been saved');
+  });
 });

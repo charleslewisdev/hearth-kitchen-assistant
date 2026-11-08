@@ -39,6 +39,21 @@ describe('parseListAmount', () => {
     expect(parseListAmount(text)).toBeNull();
   });
 
+  it.each([
+    ['2-3 lb', 2],
+    ['2–3 lb', 2],
+    ['2 to 3 lb', 2],
+    ['3 or 4', 3],
+  ])('never reads the range %j as its low end', (text, low) => {
+    // Refused until the parser reports a range's high end (#25); then it is the high end.
+    expect(parseListAmount(text)?.quantity).not.toBe(low);
+  });
+
+  it('takes amounts up to the cap and no further', () => {
+    expect(parseListAmount('99999')).toEqual({ quantity: 99_999, unit: null });
+    expect(parseListAmount('100000')).toBeNull();
+  });
+
   it('refuses text longer than the box allows', () => {
     expect(parseListAmount('1'.padEnd(MAX_LIST_AMOUNT_LENGTH + 1, ' '))).toEqual({
       quantity: 1,

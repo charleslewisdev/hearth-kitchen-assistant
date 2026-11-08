@@ -47,14 +47,20 @@ type AmountEdit = {
   seen: { quantity: number | null; unit: string | null };
 };
 
-/** Why the server refused an amount edit, in words for the cook. */
-function amountErrorMessage(err: unknown): string {
+/**
+ * Why an amount edit did not go through, in words for the cook, or null when the list says it
+ * already. NOT_FOUND means the item is gone: removed on another phone, or merged into another line
+ * by this same edit sent twice. Either way the refetch shows the truth, and a "removed" notice
+ * would be wrong for the second.
+ */
+function amountErrorMessage(err: unknown): string | null {
   const code = (err as { data?: { code?: string } } | null)?.data?.code;
   if (code === 'CONFLICT') {
     return 'That amount was changed on another phone, so your change was not saved. Check it and try again.';
   }
-  if (code === 'NOT_FOUND') return 'That item was removed on another phone.';
-  return 'Couldn’t save that amount. Please try again.';
+  if (code === 'NOT_FOUND') return null;
+  // A dropped connection mid-request lands here too, when the change may have been saved.
+  return 'That amount may not have been saved. Check it and try again.';
 }
 
 // Group unchecked items into department sections in the server's stable order,
@@ -509,7 +515,11 @@ function AmountEditor({
           Cancel
         </button>
       </div>
-      <p id={hintId} className={invalid ? styles.amountError : styles.amountHint}>
+      <p
+        id={hintId}
+        className={invalid ? styles.amountError : styles.amountHint}
+        aria-live="polite"
+      >
         {invalid
           ? 'Type an amount and unit only, like 3, 1 ½ lb or 12 oz.'
           : 'Like 3, 1 ½ lb or 12 oz. Leave it empty for no amount.'}

@@ -89,6 +89,26 @@ describe('setItemAmount', () => {
     expect(rows[0]).toMatchObject({ id: tbsp!.id, quantity: 10, unit: 'tbsp' });
   });
 
+  it('merges into the same food with no unit, and never merges an amount taken away', async () => {
+    const { id } = await createRecipe(a, {
+      title: 'Lemons',
+      servings: 1,
+      ingredientLines: ['2 lemons', '1 bag lemons', '1 jar lemons'],
+    });
+    await addRecipeToList(a, id, 1);
+    const [bare] = await itemNamed(a, 'lemons', null);
+    const [bag] = await itemNamed(a, 'lemons', 'bag');
+    const [jar] = await itemNamed(a, 'lemons', 'jar');
+
+    const merged = await setItemAmount(a, bag!.id, { quantity: 6, unit: null }, seenOf(bag!));
+    expect(merged).toMatchObject({ id: bare!.id, quantity: 8, unit: null });
+
+    // Clearing an amount leaves the row on its own, with no amount.
+    const cleared = await setItemAmount(a, jar!.id, { quantity: null, unit: null }, seenOf(jar!));
+    expect(cleared).toMatchObject({ id: jar!.id, quantity: null, unit: null });
+    expect(await itemNamed(a, 'lemons')).toHaveLength(2);
+  });
+
   it('does not merge a changed unit into a checked-off row or a staple', async () => {
     const { id } = await createRecipe(a, {
       title: 'Two Butters',
@@ -146,6 +166,39 @@ describe('setItemAmount', () => {
     ).toBe('CONFLICT');
     const [rice] = await itemNamed(a, 'rice');
     expect(rice).toMatchObject({ quantity: 2, unit: 'cup' });
+  });
+
+  it('lets only one of two edits made at once from the same amount win', async () => {
+    const eggs = await addManualItem(a, '6 eggs');
+
+    const results = await Promise.allSettled([
+      setItemAmount(a, eggs.id, { quantity: 12, unit: null }, seenOf(eggs)),
+      setItemAmount(a, eggs.id, { quantity: 18, unit: null }, seenOf(eggs)),
+    ]);
+
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    const refused = results.find((r) => r.status === 'rejected') as PromiseRejectedResult;
+    expect((refused.reason as { code: string }).code).toBe('CONFLICT');
+  });
+
+  it('never loses a recipe added at the same moment as an edit', async () => {
+    const { id } = await createRecipe(a, {
+      title: 'Rice Bowl',
+      servings: 1,
+      ingredientLines: ['1 cup rice'],
+    });
+    await addRecipeToList(a, id, 1);
+    const [rice] = await itemNamed(a, 'rice');
+
+    const [edit] = await Promise.allSettled([
+      setItemAmount(a, rice!.id, { quantity: 5, unit: 'cup' }, seenOf(rice!)),
+      addRecipeToList(a, id, 1),
+    ]);
+
+    const [after] = await itemNamed(a, 'rice');
+    // Edit first, then the add on top of it; or the add first and the edit refused.
+    if (edit.status === 'fulfilled') expect(after!.quantity).toBe(6);
+    else expect(after!.quantity).toBe(2);
   });
 
   it('accepts the same edit twice, as a resent request would', async () => {

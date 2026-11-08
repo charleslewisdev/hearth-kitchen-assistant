@@ -214,6 +214,11 @@
   cursor: pointer;
 }
 
+.amount:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
 .amount:disabled {
   opacity: 0.5;
   cursor: default;
@@ -302,7 +307,11 @@
   color: var(--color-leftover-text);
 }
 
+/* Stays in view at the top while the cook is scrolled down to the row it is about. */
 .notice {
+  position: sticky;
+  top: 8px;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 10px;
