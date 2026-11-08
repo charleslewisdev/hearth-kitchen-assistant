@@ -292,6 +292,12 @@ export type BuildServerOptions = {
    * limiters key on, so it is worth testing at more than one setting.
    */
   trustProxy?: number | string[];
+  /**
+   * The global limiter's per-minute cap. Defaults to `env.RATE_LIMIT_MAX`; a seam for the same
+   * reason as `trustProxy`, so a test can show the configured number is the one enforced
+   * without spending 300 requests to do it.
+   */
+  rateLimitMax?: number;
   /** The built web app to serve (D46); `null` serves none. Defaults to `resolveWebDist()`. */
   webDist?: string | null;
 };
@@ -348,7 +354,8 @@ export async function buildServer(opts: BuildServerOptions = {}): Promise<Fastif
    * the same trade the auth limiter makes, for the same reason.
    */
   await app.register(rateLimit, {
-    max: 300,
+    // 300 unless RATE_LIMIT_MAX says otherwise; only the e2e suite raises it (env.ts).
+    max: opts.rateLimitMax ?? env.RATE_LIMIT_MAX,
     timeWindow: '1 minute',
     /**
      * One line per refused request, at `warn`.

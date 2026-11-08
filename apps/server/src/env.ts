@@ -165,6 +165,14 @@ export const envSchema = z.object({
    */
   TRUST_PROXY: z.preprocess(blankIsAbsent, trustProxySchema.default(0)),
   /**
+   * Requests one client may make in a minute before the global limiter answers 429 (server.ts).
+   * Not a knob a deployment needs: 300 is far above what a household produces. It exists for
+   * the Playwright suite, whose whole run comes from 127.0.0.1 inside a minute and passed 300
+   * once it grew to ~16 specs; `e2e/playwright.config.ts` starts its server with a high value.
+   * Better Auth's own per-path limiter on sign-in is separate and does not read this.
+   */
+  RATE_LIMIT_MAX: z.preprocess(blankIsAbsent, z.coerce.number().int().min(1).default(300)),
+  /**
    * Where the built web app is, so this process serves it (D46). Unset: `apps/web/dist` beside
    * the server, if it exists. The development setup has no build there and uses Vite instead.
    */

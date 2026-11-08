@@ -1104,6 +1104,23 @@ describe('global rate limit', () => {
     expect((failure.err as { frames?: string[] }).frames).toBeUndefined();
   });
 
+  /**
+   * RATE_LIMIT_MAX reaches the limiter (the e2e suite raises it; env.test.ts covers parsing).
+   * Through the `rateLimitMax` seam, because env is parsed once at import. A small number, so
+   * an off-by-default that ignored the option would show as 404s past the third request.
+   */
+  it('enforces the configured cap instead of 300 when one is given', async () => {
+    const client = '203.0.113.39';
+    const small = await buildServer({ rateLimitMax: 3 });
+    try {
+      const send = () => small.inject({ method: 'GET', url: '/nope', remoteAddress: client });
+      expect(await statusesOf(3, send)).toEqual([404]);
+      expect((await send()).statusCode).toBe(429);
+    } finally {
+      await small.close();
+    }
+  });
+
   it('keys on the client address, so one hammering client cannot lock the household out', async () => {
     const hammering = '203.0.113.33';
     const bystander = '203.0.113.34';

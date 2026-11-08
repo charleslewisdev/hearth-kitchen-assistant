@@ -46,6 +46,15 @@ export default defineConfig({
       */
       command: `pnpm --filter @hearth/server dev 2>&1 | tee ${SERVER_LOG_RELATIVE}`,
       cwd: repoRoot,
+      /*
+        The whole suite runs from 127.0.0.1 in about a minute, and at ~16 specs it makes more
+        than the 300 requests a minute the global limiter allows one client in production: the
+        specs that ran last got 429s and failed only in the full run. Raised here, for this
+        process only; Playwright merges it over the inherited environment. A REUSED server keeps
+        whatever limit it was started with, so stop a dev server before a full run.
+        Better Auth's sign-in limiter does not read this and is unchanged.
+      */
+      env: { RATE_LIMIT_MAX: '100000' },
       url: `${API_URL}/health`,
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,

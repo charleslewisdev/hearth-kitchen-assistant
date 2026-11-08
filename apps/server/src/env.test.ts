@@ -227,3 +227,32 @@ describe('env schema: SMTP defaults and bounds', () => {
     expect(() => parse({ SMTP_PORT: port })).toThrow();
   });
 });
+
+/**
+ * The global limiter's cap. Only the e2e suite sets it, but it goes through the same blank-is-
+ * absent rule as every numeric variable: '' read as a value would coerce to 0, and a cap of 0
+ * would refuse every request the box receives.
+ */
+describe('env schema: RATE_LIMIT_MAX', () => {
+  it('defaults to the production cap of 300', () => {
+    expect(parse({}).RATE_LIMIT_MAX).toBe(300);
+  });
+
+  it.each(['', ' ', '\t'])('reads RATE_LIMIT_MAX=%j as absent, not as a cap of 0', (blank) => {
+    expect(parse({ RATE_LIMIT_MAX: blank }).RATE_LIMIT_MAX).toBe(300);
+  });
+
+  it('takes a configured cap over the default', () => {
+    expect(parse({ RATE_LIMIT_MAX: '100000' }).RATE_LIMIT_MAX).toBe(100000);
+    expect(parse({ RATE_LIMIT_MAX: '1' }).RATE_LIMIT_MAX).toBe(1);
+  });
+
+  it.each([
+    ['a cap that is not a number', 'lots'],
+    ['a cap of zero', '0'],
+    ['a negative cap', '-5'],
+    ['a fractional cap', '1.5'],
+  ])('rejects %s', (_name, value) => {
+    expect(() => parse({ RATE_LIMIT_MAX: value })).toThrow();
+  });
+});
