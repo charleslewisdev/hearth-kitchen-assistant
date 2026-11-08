@@ -87,6 +87,7 @@ export async function exportRecipes(
       const md: MarkdownRecipe = {
         title: row.title,
         servings: row.servings,
+        servingsHigh: row.servingsHigh,
         prepMinutes: row.prepMinutes,
         cookMinutes: row.cookMinutes,
         types: row.mealTypes,

@@ -147,8 +147,9 @@ with amounts on it is what Hearth looks for." Add amounts or the two headings an
 
 Choose a `.md` file that a Hearth exported, from yours or from another one. You can also paste
 the file's text into **Text**. Hearth reads every field as the file states it, so for an exported
-file nothing on the review screen is marked as a guess: the title, servings, times, recipe types,
-tags, rating, source, notes, ingredients and steps all come back as they were.
+file nothing on the review screen is marked as a guess: the title, servings (with **Up to** for a
+range such as 4 to 6), times, recipe types, tags, rating, source, notes, ingredients and steps all
+come back as they were.
 
 - **Linked recipes.** An ingredient made from another recipe is written as `[[Recipe title]]`.
   Import that recipe first. If it is not in your Hearth, saving says "Ingredient 2 links to a

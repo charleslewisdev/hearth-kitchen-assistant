@@ -23,6 +23,8 @@ export function draftFromMarkdown(text: string): RecipeDraft | null {
   draft.servings = stated.servings
     ? field(recipe.servings, 'high', String(recipe.servings))
     : draft.servings;
+  // The review screen's Up to box starts from this, so the save sends the file's range (D53).
+  draft.servingsHigh = recipe.servingsHigh;
   draft.mealTypes = field(recipe.types, 'high', recipe.types.join(', ') || null);
   draft.tags = field(recipe.tags, 'high', recipe.tags.join(', ') || null);
   draft.ingredientLines = field(recipe.ingredientLines, 'high', null);

@@ -45,6 +45,7 @@ const STOCK = {
 const RICH = {
   title: 'Charred Fennel & "Smoky" Barley: Take 2',
   servings: 6,
+  servingsHigh: 8,
   mealTypes: ['dinner' as const, 'side' as const],
   tags: ['weeknight', 'Make Ahead', 'grains'],
   ingredientLines: [
@@ -73,6 +74,7 @@ function exported(recipe: Assembled) {
   return {
     title: recipe.title,
     servings: recipe.servings,
+    servingsHigh: recipe.servingsHigh,
     prepMinutes: recipe.prepMinutes,
     cookMinutes: recipe.cookMinutes,
     mealTypes: recipe.mealTypes,
@@ -115,6 +117,7 @@ describe('Markdown export and import', () => {
     const original = (await from.caller.recipe.get({ idOrSlug: slug }))!;
     expect(original.ingredients.some((i) => i.altQuantity === 360)).toBe(true);
     expect(original.ingredients[1]?.linkedRecipe?.title).toBe('House Stock');
+    expect(original.servingsHigh).toBe(8);
 
     const files = await exportRecipes(from.householdId);
     const byTitle = new Map(files.map((f) => [f.title, f.markdown]));

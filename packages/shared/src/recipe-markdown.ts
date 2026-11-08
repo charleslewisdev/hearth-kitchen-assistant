@@ -4,10 +4,10 @@ import { slugify } from './slug';
 /**
  * A recipe as a Markdown file, for export and for importing it back (D52).
  *
- * Front matter carries the fields a person would not want to hunt for in prose (title, servings,
- * times, types, tags, rating, source), and the body carries the recipe as anyone would write it:
- * `## Ingredients` as a list, `## Method` as a numbered list, `## Notes` as text. Human-readable
- * first, and deterministic: `parseRecipeMarkdown(recipeToMarkdown(r))` is `r` again.
+ * Front matter carries the fields a person would not want to hunt for in prose (title, servings
+ * and the high end of a servings range, times, types, tags, rating, source), and the body
+ * carries the recipe as anyone would write it: `## Ingredients` as a list, `## Method` as a
+ * numbered list, `## Notes` as text. Human-readable first, and deterministic: `parseRecipeMarkdown(recipeToMarkdown(r))` is `r` again.
  *
  * Every front-matter value is written as JSON (a quoted string, an integer, or a flow list of
  * strings), which is valid YAML too, so any YAML tool reads the file and this module needs no
@@ -26,6 +26,8 @@ import { slugify } from './slug';
 export interface MarkdownRecipe {
   title: string;
   servings: number;
+  /** The high end of a servings range (D53), always above `servings`; null for one number. */
+  servingsHigh: number | null;
   prepMinutes: number | null;
   cookMinutes: number | null;
   types: RecipeType[];
@@ -48,6 +50,9 @@ const MAX_FRONT_MATTER = 50_000;
 
 /** The same bound `recipe.update` puts on a time. */
 const MAX_MINUTES = 10_000;
+
+/** The same bound `recipe.create` and `recipe.update` put on the high end of a servings range. */
+const MAX_SERVINGS_HIGH = 10_000;
 
 const quote = (value: string) => JSON.stringify(value);
 const list = (values: readonly string[]) => `[${values.map(quote).join(', ')}]`;
@@ -78,6 +83,8 @@ export function recipeToMarkdown(recipe: MarkdownRecipe): string {
     `title: ${quote(recipe.title)}`,
   ];
   front.push(`servings: ${recipe.servings}`);
+  // Only when there is a range, so a file without one is the same bytes it was before D53.
+  if (recipe.servingsHigh !== null) front.push(`servings_high: ${recipe.servingsHigh}`);
   if (recipe.prepMinutes !== null) front.push(`prep_minutes: ${recipe.prepMinutes}`);
   if (recipe.cookMinutes !== null) front.push(`cook_minutes: ${recipe.cookMinutes}`);
   if (recipe.types.length > 0) front.push(`types: ${list(recipe.types)}`);
@@ -213,6 +220,7 @@ const FRONT_MATTER_KEYS = [
   'hearth_format',
   'title',
   'servings',
+  'servings_high',
   'prep_minutes',
   'cook_minutes',
   'types',
@@ -348,6 +356,12 @@ export function readRecipeMarkdown(input: string): ReadMarkdownRecipe | null {
   const recipe: MarkdownRecipe = {
     title,
     servings: servings ?? 1,
+    // A high end only above a stated low end, and no higher than the API takes: anything else is
+    // dropped like any other value Hearth would refuse, never stretched to fit the fallback 1.
+    servingsHigh:
+      servings === null
+        ? null
+        : integerField(fields.get('servings_high'), servings + 1, MAX_SERVINGS_HIGH),
     prepMinutes: integerField(fields.get('prep_minutes'), 0, MAX_MINUTES),
     cookMinutes: integerField(fields.get('cook_minutes'), 0, MAX_MINUTES),
     types: types.filter(
