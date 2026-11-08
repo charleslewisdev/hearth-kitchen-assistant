@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { RECIPE_TYPES, type RecipeType } from '@hearth/shared';
+import { formatQuantityRange, RECIPE_TYPES, type RecipeType } from '@hearth/shared';
 import { trpc } from '../lib/trpc';
 import { isBuildingBlock, tagStyle, typeLabels, useTagColors } from '../lib/tags';
 import { RecipesSubnav } from '../app/RecipesSubnav';
@@ -63,6 +63,7 @@ interface Card {
   title: string;
   slug: string;
   servings: number;
+  servingsHigh: number | null;
   mealTypes: string[];
   prepMinutes: number | null;
   cookMinutes: number | null;
@@ -569,7 +570,7 @@ export function Library() {
                     <p className={styles.foot}>
                       <span className={styles.footItem}>
                         {PEOPLE}
-                        Serves {recipe.servings}
+                        Serves {formatQuantityRange(recipe.servings, recipe.servingsHigh)}
                       </span>
                       {recipe.rating !== null && (
                         <span

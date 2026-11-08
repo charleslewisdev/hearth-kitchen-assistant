@@ -21,6 +21,7 @@ import { SourceField } from './SourceField';
 import { TagSuggestionChips } from './TagSuggestionChips';
 import styles from './RecipeEdit.module.css';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
+import { servingsHighFrom } from '../lib/servings';
 
 const MEAL_TYPES = RECIPE_TYPES;
 type MealType = RecipeType;
@@ -54,6 +55,8 @@ export function RecipeEdit() {
   const [loadedId, setLoadedId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [servings, setServings] = useState(1);
+  // The high end of a servings range, as typed; empty for a recipe that serves one number (D53).
+  const [servingsHighText, setServingsHighText] = useState('');
   const [mealTypes, setMealTypes] = useState<MealType[]>([]);
   const [tags, setTags] = useState<string[]>([]);
   const [ingredientsText, setIngredientsText] = useState('');
@@ -79,6 +82,7 @@ export function RecipeEdit() {
     setLoadedId(loaded.id);
     setTitle(loaded.title);
     setServings(loaded.servings);
+    setServingsHighText(loaded.servingsHigh == null ? '' : String(loaded.servingsHigh));
     setMealTypes(loaded.mealTypes as MealType[]);
     setTags(loaded.tags);
     setIngredientsText(
@@ -194,6 +198,8 @@ export function RecipeEdit() {
 
   // A refused link (a missing or shared title, a cycle) comes back as a sentence worth showing,
   // under a code input validation never uses. Anything else gets the general message.
+  const servingsHighIgnored =
+    servingsHighText.trim() !== '' && servingsHighFrom(servingsHighText, servings) === null;
   const saveError =
     mutation.error?.data?.code === 'UNPROCESSABLE_CONTENT'
       ? mutation.error.message
@@ -204,6 +210,7 @@ export function RecipeEdit() {
     const input = {
       title: title.trim(),
       servings,
+      servingsHigh: servingsHighFrom(servingsHighText, servings),
       mealTypes,
       tags,
       ingredientLines,
@@ -255,19 +262,39 @@ export function RecipeEdit() {
           />
         </label>
 
-        <label className={styles.field}>
-          <span className={styles.label}>Servings</span>
-          <input
-            type="number"
-            min={1}
-            className={styles.input}
-            value={servings}
-            onChange={(e) => {
-              const n = Number.parseInt(e.target.value, 10);
-              setServings(Number.isNaN(n) || n < 1 ? 1 : n);
-            }}
-          />
-        </label>
+        {/* "Serves 4 to 6": the low end is what the recipe scales from (D53). */}
+        <div className={styles.timeRow}>
+          <label className={styles.field}>
+            <span className={styles.label}>Servings</span>
+            <input
+              type="number"
+              min={1}
+              className={styles.input}
+              value={servings}
+              onChange={(e) => {
+                const n = Number.parseInt(e.target.value, 10);
+                setServings(Number.isNaN(n) || n < 1 ? 1 : n);
+              }}
+            />
+          </label>
+          <label className={styles.field}>
+            <span className={styles.label}>Up to (optional)</span>
+            <input
+              type="number"
+              min={servings + 1}
+              inputMode="numeric"
+              className={styles.input}
+              value={servingsHighText}
+              aria-describedby={servingsHighIgnored ? 'servings-high-hint' : undefined}
+              onChange={(e) => setServingsHighText(e.target.value)}
+            />
+            {servingsHighIgnored && (
+              <span id="servings-high-hint" className={styles.hint}>
+                More than {servings} makes a range; this will be left out.
+              </span>
+            )}
+          </label>
+        </div>
 
         <fieldset className={styles.field}>
           <legend className={styles.label}>Recipe type</legend>

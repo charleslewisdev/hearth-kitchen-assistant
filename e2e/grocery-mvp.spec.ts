@@ -39,12 +39,14 @@ test('grocery mvp happy path: recipe -> list -> staple -> check off', async ({ p
 
   await page.getByLabel('Title').fill('E2E Soup');
   await page.getByLabel('Servings').fill('4');
+  // A servings range (D53): "Serves 4–6", scaled from the 4.
+  await page.getByLabel('Up to (optional)').fill('6');
   await page.getByRole('checkbox', { name: 'dinner' }).check();
 
-  // One line WITH a unit, one that scales, and one "to taste".
+  // One line WITH a unit, a range that scales at both ends, and one "to taste".
   await page
     .getByLabel('Ingredients, one per line')
-    .fill('2 cups broth\n3 cloves garlic\nsalt to taste');
+    .fill('2 cups broth\n2-3 cloves garlic\nsalt to taste');
 
   await page.getByRole('textbox', { name: 'Step 1' }).fill('Simmer the broth and garlic.');
   await page.getByRole('button', { name: /Add step/ }).click();
@@ -59,6 +61,9 @@ test('grocery mvp happy path: recipe -> list -> staple -> check off', async ({ p
 
   const brothIngredient = page.getByRole('listitem').filter({ hasText: 'broth' });
   await expect(brothIngredient).toContainText('2 cups');
+  const garlicIngredient = page.getByRole('listitem').filter({ hasText: 'garlic' });
+  await expect(garlicIngredient).toContainText('2–3 cloves');
+  await expect(page.getByLabel('Servings', { exact: true })).toHaveText('4–6');
 
   const increase = page.getByRole('button', { name: 'Increase servings' });
   await increase.click();
@@ -67,6 +72,7 @@ test('grocery mvp happy path: recipe -> list -> staple -> check off', async ({ p
   await increase.click();
   await expect(page.getByLabel('Servings', { exact: true })).toHaveText('8');
   await expect(brothIngredient).toContainText('4 cups');
+  await expect(garlicIngredient).toContainText('4–6 cloves');
 
   // 4. Add the (scaled) recipe to the shopping list.
   await page.getByRole('button', { name: 'Add to list' }).click();
@@ -85,6 +91,8 @@ test('grocery mvp happy path: recipe -> list -> staple -> check off', async ({ p
   const brothItem = page.getByRole('listitem').filter({ hasText: 'broth' });
   await expect(brothItem).toBeVisible();
   await expect(brothItem).toContainText('4 cups');
+  // The list buys the high end of the range: 3 cloves for 4, doubled.
+  await expect(page.getByRole('listitem').filter({ hasText: 'garlic' })).toContainText('6');
 
   // 6. Add a manual staple via the add bar.
   await page.getByLabel('Add a staple').fill('paper towels');
