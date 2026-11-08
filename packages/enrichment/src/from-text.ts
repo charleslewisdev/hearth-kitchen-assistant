@@ -1,4 +1,4 @@
-import { MAX_TEXT_LENGTH, parseIngredientLine } from '@hearth/shared';
+import { MAX_TEXT_LENGTH, normalizeUnit, parseIngredientLine } from '@hearth/shared';
 import { emptyDraft, field } from './draft';
 import { repairOcrAmounts } from './ocr-amounts';
 import type { DraftSource, RecipeDraft } from './draft';
@@ -745,6 +745,134 @@ function continuesOnNextLine(text: string): boolean {
 }
 
 /**
+ * The adverbs a recipe puts in front of a preparation word: "thinly sliced", "finely chopped".
+ * The same list `splitLeadingDescriptors` in `@hearth/shared` uses, kept here as a lookup because
+ * that one is private to the parser.
+ */
+const PREP_ADVERBS = new Set([
+  'finely',
+  'roughly',
+  'coarsely',
+  'thinly',
+  'thickly',
+  'freshly',
+  'lightly',
+  'firmly',
+  'loosely',
+  'very',
+  'well',
+  'newly',
+]);
+
+/** Past participles that do not end in "-ed". */
+const IRREGULAR_PARTICIPLES = new Set([
+  'ground',
+  'frozen',
+  'torn',
+  'cut',
+  'beaten',
+  'broken',
+  'shaven',
+]);
+
+/**
+ * A word ending in "-ed" that is a participle: "marinated", "shredded", "dried". Five letters at
+ * least, and not "-eed", so "red" and "flaxseed" are food. Bounded and anchored: linear.
+ */
+const ED_PARTICIPLE = /^\p{Ll}{3,30}(?<!e)ed$/u;
+
+function isParticiple(word: string): boolean {
+  return IRREGULAR_PARTICIPLES.has(word) || ED_PARTICIPLE.test(word);
+}
+
+/**
+ * The words an amount can be followed by before the food is named: a size, a form, a container.
+ * A line whose food is nothing but these ("2 large", "1 (15-ounce) can", "1 can whole") has not
+ * named its food yet.
+ */
+const FOODLESS_WORDS = new Set([
+  'large',
+  'medium',
+  'small',
+  'extra-large',
+  'jumbo',
+  'whole',
+  'fresh',
+  'ripe',
+  'raw',
+  'extra-virgin',
+  'all-purpose',
+  'boneless',
+  'skinless',
+  'can',
+  'cans',
+  'jar',
+  'jars',
+  'tin',
+  'tins',
+  'package',
+  'packages',
+  'packet',
+  'packets',
+  'box',
+  'bag',
+  'bottle',
+  'carton',
+]);
+
+/**
+ * Whether an ingredient line stops where an ingredient cannot, so a lower-case line under it is
+ * the rest of it: the weaker sibling of `continuesOnNextLine`, used only when the next line also
+ * leads with no amount (`leadsWithNoAmount`).
+ *
+ * Three ends count:
+ *  - an article: "1 tablespoon juice of the" / "lemon";
+ *  - a prep adverb that is not finishing a participle: "drained and thinly" / "sliced", but not
+ *    "sliced thinly", which is a whole phrase;
+ *  - an amount with no food named yet, sizes, forms, containers and participles aside:
+ *    "2 large" / "eggs", "1 (15-ounce) can" / "chickpeas", "1 jar roasted" / "peppers".
+ *
+ * A participle after a food is NOT an unfinished end, comma or no comma: a paste writes
+ * "2 eggs beaten" and "1 onion diced" as often as with the comma, and "salt and pepper" under
+ * them is an ingredient of its own. So "¼ cup Greek marinated" / "artichokes" is left as two
+ * lines: "Greek" could be the food as far as shape can tell.
+ */
+function endsUnfinished(text: string): boolean {
+  if (text.length > MAX_INGREDIENT_CHARS) return false;
+  const tokens = text.split(' ');
+  const last = tokens[tokens.length - 1]!;
+  const before = (tokens[tokens.length - 2] ?? '').toLowerCase();
+  if (last === 'a' || last === 'an' || last === 'the') return true;
+  const word = last.toLowerCase();
+  if (PREP_ADVERBS.has(word)) return !isParticiple(before);
+  return namesNoFood(text);
+}
+
+/** Whether a line has an amount and nothing but sizes, forms and containers after it. */
+function namesNoFood(text: string): boolean {
+  const parsed = parseIngredientLine(text);
+  if (parsed.quantity === null) return false;
+  return parsed.foodName
+    .toLowerCase()
+    .split(' ')
+    .every(
+      (word) =>
+        word === '' || FOODLESS_WORDS.has(word) || PREP_ADVERBS.has(word) || isParticiple(word),
+    );
+}
+
+/**
+ * Whether a line leads with no amount at all: no figure, no worded amount ("a handful of",
+ * "one onion", "pinch of salt") and no unit word ("cup chopped chives"). A lower-case line that
+ * does is an ingredient of its own, whatever the line above ended with.
+ */
+function leadsWithNoAmount(text: string): boolean {
+  if (text.length > MAX_INGREDIENT_CHARS) return false;
+  if (normalizeUnit(text.split(' ', 1)[0]!) !== null) return false;
+  return parseIngredientLine(text).quantity === null;
+}
+
+/**
  * A line that starts with a joining word carries on the one above it, whatever that ended with:
  * no ingredient starts with "and" ("1 cup Carmona Olives, pitied" / "and halved").
  */
@@ -796,7 +924,9 @@ function toIngredients(lines: Line[], block: Block, amounts: boolean[]): string[
       HAS_WORD.test(text) &&
       (text.startsWith('(') ||
         CONTINUING_WORD.test(text) ||
-        (/^\p{Ll}/u.test(text) && continuesOnNextLine(previous)));
+        (/^\p{Ll}/u.test(text) &&
+          (continuesOnNextLine(previous) ||
+            (endsUnfinished(previous) && leadsWithNoAmount(text)))));
     // "For the topping:" is a label, not a food. Left in, it becomes a Food row and then a line
     // on the shopping list. Asked after the wrap, so "for spreading" under "butter, at room
     // temperature," stays the end of the butter.
@@ -820,11 +950,13 @@ function toIngredients(lines: Line[], block: Block, amounts: boolean[]): string[
  * more space above it than between its own lines ("1 (12-ounce) jar roasted" / "red peppers,
  * drained"), and a photo import turns that space into a blank line (`reading-order.ts`). Read
  * line by line, "red peppers, drained" is an ingredient of its own, and a jar of peppers is two
- * rows on the shopping list. The ordinary rule in `toIngredients` cannot join it: "roasted"
- * could end an ingredient as well as any word could.
+ * rows on the shopping list. The ordinary rule in `toIngredients` now joins this one too
+ * (`endsUnfinished`: "1 jar roasted" names no food yet), but not a wrap that falls after the
+ * food ("1 jar roasted peppers" / "packed in oil, drained"), which only the spacing can say is
+ * one ingredient.
  *
  * Only when the list itself says so, which is most of its amount lines having a blank above
- * them. A paste has no blank lines inside a list at all, and that rule stays as it was.
+ * them. A paste has no blank lines inside a list at all, and the ordinary rule alone reads it.
  */
 function blankSeparated(lines: Line[], block: Block, amounts: boolean[]): boolean {
   let counted = 0;
