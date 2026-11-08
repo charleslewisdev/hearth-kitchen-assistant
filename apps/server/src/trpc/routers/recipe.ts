@@ -88,9 +88,15 @@ export const recipeRouter = router({
   // Create a recipe (+ children) for the active household.
   create: protectedProcedure
     // `importDraftId`: the photo or PDF import this was saved from, which the save links.
+    // `rating`: the household's verdict, which only a Markdown import (D52) brings with it. On
+    // create only: `update` is the form's full state, and the form does not hold the stars.
     .input(
       z
-        .object({ ...recipeFields, importDraftId: z.string().uuid().optional() })
+        .object({
+          ...recipeFields,
+          importDraftId: z.string().uuid().optional(),
+          rating: z.number().int().min(1).max(5).nullable().optional(),
+        })
         .refine(servingsRangeRises, servingsRangeMessage),
     )
     .mutation(({ ctx, input }) => createRecipe(ctx.householdId, input)),

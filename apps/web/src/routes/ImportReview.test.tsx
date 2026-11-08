@@ -525,3 +525,75 @@ describe('keeping what a file import was read from', () => {
     );
   });
 });
+
+describe('a Markdown file exported from Hearth', () => {
+  const markdownDraft = () =>
+    makeDraft({
+      title: { value: 'Barley Pilaf', confidence: 'high', raw: 'Barley Pilaf' },
+      servings: { value: 4, confidence: 'high', raw: '4' },
+      mealTypes: { value: ['side'], confidence: 'high', raw: 'side' },
+      // Neither is a tag this household uses yet: a file's tags are the recipe's own, not hints.
+      tags: { value: ['grains', 'make ahead'], confidence: 'high', raw: 'grains, make ahead' },
+      ingredientLines: {
+        value: ['1 cup pearl barley', '2 cups stock [[House Stock]]'],
+        confidence: 'high',
+        raw: null,
+      },
+      steps: {
+        value: ['Toast the barley.\n\nKeep it moving.', 'Simmer.'],
+        confidence: 'high',
+        raw: null,
+      },
+      details: { description: 'Nutty.\n\nGood cold.', prepMinutes: 5, cookMinutes: 35 },
+      source: {
+        kind: 'markdown',
+        sourceName: 'Aunt Wren’s card box',
+        sourceUrl: 'https://example.com/pilaf',
+        rating: 4,
+      },
+    } as never);
+
+  beforeEach(() => localStorage.setItem('hearth.import.lastSource', 'Some other book, p. 3'));
+  afterEach(() => localStorage.clear());
+
+  it('saves every field the file stated, exactly, through recipe.create', async () => {
+    renderReview(markdownDraft());
+    expect(screen.queryByText(/worked out rather than stated/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /save recipe/i }));
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalled());
+    expect(mutateAsync).toHaveBeenCalledWith({
+      title: 'Barley Pilaf',
+      servings: 4,
+      mealTypes: ['side'],
+      tags: ['grains', 'make ahead'],
+      ingredientLines: ['1 cup pearl barley', '2 cups stock [[House Stock]]'],
+      steps: ['Toast the barley.\n\nKeep it moving.', 'Simmer.'],
+      sourceName: 'Aunt Wren’s card box',
+      description: 'Nutty.\n\nGood cold.',
+      prepMinutes: 5,
+      cookMinutes: 35,
+      sourceUrl: 'https://example.com/pilaf',
+      rating: 4,
+    });
+    // The file's source is the recipe's, not one the cook typed: it is not remembered.
+    expect(localStorage.getItem('hearth.import.lastSource')).toBe('Some other book, p. 3');
+  });
+
+  it('splits the steps again only once the cook has edited them', async () => {
+    renderReview(markdownDraft());
+    const note = screen.getByText(/a step in the file has a blank line inside it/i);
+    fireEvent.change(screen.getByLabelText(/steps, one per blank line/i), {
+      target: { value: 'Toast it.\n\nSimmer it.' },
+    });
+    expect(note).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /save recipe/i }));
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalled());
+    expect(mutateAsync.mock.calls[0]![0].steps).toEqual(['Toast it.', 'Simmer it.']);
+  });
+
+  it('shows the rating the file carries', () => {
+    renderReview(markdownDraft());
+    expect(screen.getByText('What the file said')).toBeInTheDocument();
+    expect(screen.getByText('4 of 5')).toBeInTheDocument();
+  });
+});

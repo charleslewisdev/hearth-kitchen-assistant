@@ -1,6 +1,6 @@
 # Importing recipes
 
-Press **+ Add / Import**. The **Add a recipe** screen has five tiles:
+Press **+ Add / Import**. The **Add a recipe** screen has six tiles:
 
 | Tile           | Use it for                                                      |
 | -------------- | --------------------------------------------------------------- |
@@ -8,6 +8,7 @@ Press **+ Add / Import**. The **Add a recipe** screen has five tiles:
 | **Photo**      | A photo of a cookbook page or a printout                        |
 | **PDF**        | A PDF, including a scan from a phone scanner app or a scanner   |
 | **Text**       | Text you copied from anywhere: a web page, an email, a document |
+| **Markdown**   | A recipe file exported from a Hearth                            |
 | **By hand**    | Typing it in ([Adding recipes by hand](adding-recipes.md))      |
 
 Every import ends on the same review screen, **Check this over**. Nothing is saved until you
@@ -141,6 +142,49 @@ Instructions
 
 If Hearth finds no ingredient list, it says: "No recipe was found in that text. An ingredient list
 with amounts on it is what Hearth looks for." Add amounts or the two headings and try again.
+
+## Markdown (a recipe exported from Hearth)
+
+Choose a `.md` file that a Hearth exported, from yours or from another one. You can also paste
+the file's text into **Text**. Hearth reads every field as the file states it, so for an exported
+file nothing on the review screen is marked as a guess: the title, servings, times, recipe types,
+tags, rating, source, notes, ingredients and steps all come back as they were.
+
+- **Linked recipes.** An ingredient made from another recipe is written as `[[Recipe title]]`.
+  Import that recipe first. If it is not in your Hearth, saving says "Ingredient 2 links to a
+  recipe that is not in your library."
+- **One file at a time.** To move a whole library, export it as a zip (see
+  [Keeping a copy of your recipes](cooking.md#keeping-a-copy-of-your-recipes)), unzip it and
+  import the files one by one.
+- **Photos** are not in the file. Add them again on the recipe screen.
+
+A file you write yourself works too, if it starts with front matter between two `---` lines
+that uses the keys shown here. A title or servings the file leaves out is marked on the review
+screen, as for any import:
+
+```
+---
+title: "Grandma's Rolls"
+servings: 12
+tags: ["bread"]
+---
+
+## Ingredients
+
+- 1 cup warm milk
+- 3 cups flour
+
+## Method
+
+1. Mix and knead.
+2. Bake at 375F for 18 minutes.
+
+## Notes
+
+Best warm.
+```
+
+Markdown without front matter goes through the ordinary text import instead.
 
 ## PDF
 
