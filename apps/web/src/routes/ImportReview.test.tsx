@@ -564,6 +564,8 @@ describe('a Markdown file exported from Hearth', () => {
     expect(mutateAsync).toHaveBeenCalledWith({
       title: 'Barley Pilaf',
       servings: 4,
+      // The Markdown format has no servings range yet, so the review sends none.
+      servingsHigh: null,
       mealTypes: ['side'],
       tags: ['grains', 'make ahead'],
       ingredientLines: ['1 cup pearl barley', '2 cups stock [[House Stock]]'],
