@@ -61,6 +61,7 @@ const SOURCE_HEADINGS: Record<SourceKind, string> = {
   text: 'What you pasted said',
   pdf: 'What the PDF said',
   image: 'What the photo said',
+  markdown: 'What the file said',
 };
 
 /**
@@ -74,6 +75,7 @@ const SOURCE_NOUNS: Record<SourceKind, string> = {
   text: 'text',
   pdf: 'PDF',
   image: 'photo',
+  markdown: 'file',
 };
 
 /**
@@ -213,6 +215,9 @@ export function ImportReview({
   const [keeping, setKeeping] = useState(false);
   const kind = draft.source.kind;
   const noun = SOURCE_NOUNS[kind];
+  // A Markdown file is the recipe's own record (D52), exported from a Hearth: its tags, source
+  // and rating are the recipe's, to be saved as they are rather than offered as suggestions.
+  const fromFile = draft.source.kind === 'markdown' ? draft.source : null;
   const sourceLink = linkableSource(draft.source);
 
   const [title, setTitle] = useState(() => reviewed(draft.title));
@@ -235,17 +240,17 @@ export function ImportReview({
       ),
     [draft, tagList.data],
   );
-  const [typedTags, setTypedTags] = useState<string[] | null>(null);
+  const [typedTags, setTypedTags] = useState<string[] | null>(fromFile ? draft.tags.value : null);
   const tags = typedTags ?? tagSuggestions.chosen;
   const tagsFlagged = typedTags === null && draft.tags.confidence === 'low';
   // A link is its own source. For a photo, PDF or paste, start from the last source typed on
   // this device: a batch from one cookbook then only needs its page number changed.
   const [sourceName, setSourceName] = useState(() =>
-    draft.source.kind === 'url' ? '' : readLastSource(),
+    fromFile ? (fromFile.sourceName ?? '') : draft.source.kind === 'url' ? '' : readLastSource(),
   );
   // A link for a draft that is not a page: the recipe was pasted because its page would not
   // fetch, or the cook knows where a photographed one lives online. A URL draft has its own.
-  const [sourceUrlText, setSourceUrlText] = useState('');
+  const [sourceUrlText, setSourceUrlText] = useState(fromFile?.sourceUrl ?? '');
   const typedSourceUrl = sourceUrlInput(sourceUrlText);
   // The page's headnote and times, when it stated them; empty for a photo, PDF or paste.
   const [notes, setNotes] = useState(draft.details.description ?? '');
@@ -265,10 +270,17 @@ export function ImportReview({
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => line !== '');
-  const stepLines = steps.text
-    .split(/\n{2,}/)
-    .map((step) => step.trim())
-    .filter((step) => step !== '');
+  // A Markdown file's steps arrive as a list and may hold blank lines of their own, which the
+  // box below cannot tell from the gap between two steps. They are saved as the file had them
+  // until the cook edits the box; from then on the box is what the cook says.
+  const [stepsEdited, setStepsEdited] = useState(false);
+  const stepLines =
+    fromFile && !stepsEdited
+      ? draft.steps.value
+      : steps.text
+          .split(/\n{2,}/)
+          .map((step) => step.trim())
+          .filter((step) => step !== '');
 
   const canSave =
     title.value.trim() !== '' && typedSourceUrl !== 'invalid' && !create.isPending && !keeping;
@@ -297,8 +309,11 @@ export function ImportReview({
           : {}),
       // A photo or PDF import's kept draft, which the save links to this recipe for study.
       ...(draft.importDraftId ? { importDraftId: draft.importDraftId } : {}),
+      // The household's verdict, which only a Markdown file carries over.
+      ...(fromFile?.rating != null ? { rating: fromFile.rating } : {}),
     });
-    if (draft.source.kind !== 'url') writeLastSource(sourceName.trim());
+    // Remembered for the next photo from the same book; a file's source is its own, not typed.
+    if (draft.source.kind !== 'url' && !fromFile) writeLastSource(sourceName.trim());
     if (sourceFiles) {
       setKeeping(true);
       await keepSources(saved.id, sourceFiles, uploadFile.mutateAsync);
@@ -553,9 +568,18 @@ export function ImportReview({
             className={steps.flagged ? styles.textareaFlagged : styles.textarea}
             aria-describedby={describedBy('steps-flag', steps.flagged)}
             value={steps.text}
-            onChange={(e) => setSteps({ ...steps, text: e.target.value, flagged: false })}
+            onChange={(e) => {
+              setStepsEdited(true);
+              setSteps({ ...steps, text: e.target.value, flagged: false });
+            }}
           />
         </label>
+        {fromFile && !stepsEdited && draft.steps.value.some((step) => step.includes('\n\n')) && (
+          <Flag id="steps-paragraphs">
+            A step in the file has a blank line inside it. It is saved as one step, as the file has
+            it, unless you edit the steps here.
+          </Flag>
+        )}
         {steps.flagged && (
           <Flag id="steps-flag">
             {`The split into steps is a guess, worked out from the ${noun}.`}
@@ -604,6 +628,7 @@ export function ImportReview({
               ['Yield', draft.servings.raw],
               ['Category', draft.mealTypes.raw],
               ['Keywords', draft.tags.raw],
+              ...(fromFile?.rating != null ? [['Rating', `${fromFile.rating} of 5`] as const] : []),
             ] as const
           ).map(([label, value]) => (
             <div key={label} className={styles.sourceRow}>

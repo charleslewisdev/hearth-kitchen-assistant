@@ -254,6 +254,13 @@ describe('RecipeView', () => {
     expect(sheet).toHaveTextContent('Combine everything.');
   });
 
+  it('offers the recipe as a Markdown file to download', () => {
+    renderView();
+    const link = screen.getByRole('link', { name: 'Download as Markdown' });
+    expect(link).toHaveAttribute('href', '/api/export/recipes/r1');
+    expect(link).toHaveAttribute('download');
+  });
+
   it("starts cooking at the recipe's own servings when the scaler is untouched", () => {
     renderView();
     expect(screen.getByRole('link', { name: 'Start cooking' })).toHaveAttribute(

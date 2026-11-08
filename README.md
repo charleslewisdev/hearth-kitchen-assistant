@@ -10,7 +10,8 @@ The app is called Hearth; `hearth-kitchen-assistant` is only the name of this re
 add recipes by hand or import them from a URL, pasted text, a PDF or a photo, cook from them, plan
 meals, and turn the plan into a department-grouped shopping list that works in a store with a bad
 signal. Accounts are invite-only: the owner claims a fresh instance with a first-boot token and
-invites family by email. Pantry, spend tracking and full data export are still to come; the
+invites family by email. Recipes export as Markdown files that another Hearth imports again.
+Pantry, spend tracking and a full data export (photos, plans and lists) are still to come; the
 [Roadmap](docs/ROADMAP.md) has the detail.
 
 ## Screenshots

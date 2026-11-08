@@ -89,6 +89,8 @@ describe('the draft type round-trips through recipe.create', () => {
         // Optional here as it is in the router, and a URL draft does send it: `.strict()` is
         // what makes this line load-bearing rather than decorative.
         sourceUrl: z.string().optional(),
+        sourceName: z.string().max(200).optional(),
+        rating: z.number().int().min(1).max(5).optional(),
         description: z.string().optional(),
         prepMinutes: z.number().int().min(0).optional(),
         cookMinutes: z.number().int().min(0).optional(),

@@ -400,6 +400,19 @@ export function Household() {
 
       <WeekStartSetting />
 
+      {/* No lock-in (D52): every recipe as Markdown, which any Hearth imports again. Every
+          member, not only the owner: anyone here can already read every recipe. */}
+      <div className={styles.section}>
+        <h2 className={styles.sectionTitle}>Your recipes</h2>
+        <a href="/api/export/recipes.zip" download className={styles.secondaryLink}>
+          Export all recipes
+        </a>
+        <p className={styles.hint}>
+          A zip with one Markdown file per recipe. Any Hearth can take one back in, under Add a
+          recipe, then Markdown. Photos are not included.
+        </p>
+      </div>
+
       <div className={styles.section}>
         <button
           type="button"
