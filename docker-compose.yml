@@ -82,6 +82,9 @@ services:
       # `silent` is the one level that breaks a zero-config install: with no SMTP configured
       # the log line IS how an invitation or a verification link is delivered.
       LOG_LEVEL:
+      # Per-client requests per minute before a 429. Unset means 300 (env.ts); a deployment
+      # has no reason to change it.
+      RATE_LIMIT_MAX:
     # Loopback, so only this machine reaches it until you choose to put a proxy in front.
     ports:
       - '127.0.0.1:8080:3000'

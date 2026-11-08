@@ -19,6 +19,8 @@ jobs:
       # The one origin-shaped value. `BETTER_AUTH_URL` and `WEB_ORIGIN` used to be set here too;
       # the first is gone from the schema and the second is only this one's fallback.
       PUBLIC_URL: http://localhost:5173
+      # RATE_LIMIT_MAX is deliberately NOT set: server.test.ts asserts the production cap of 300,
+      # and CI does not run the e2e suite that raises it (e2e/playwright.config.ts).
     steps:
       - uses: actions/checkout@v7
       # action-setup reads the pinned version from package.json "packageManager".
