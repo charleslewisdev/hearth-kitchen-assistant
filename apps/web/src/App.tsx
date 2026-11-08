@@ -1,8 +1,26 @@
-import { useEffect, useRef } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { BrowserRouter, Outlet, Routes, Route } from 'react-router-dom';
 import { trpc, trpcClient } from './lib/trpc';
 import { authClient } from './lib/auth';
+import { queryClient } from './lib/query-client';
+import {
+  enterScope,
+  forgetOfflineData,
+  knownSessionSnapshot,
+  leaveScope,
+  pendingSignOut,
+  persistOptionsFor,
+  parseKnownSession,
+  rememberSession,
+  scopeOf,
+  setPendingSignOut,
+  subscribeKnownSession,
+  type KnownSession,
+} from './lib/offline';
+import { KeptSessionContext } from './lib/offline-context';
+import { decideGate } from './lib/session-gate';
 import { AppShell } from './app/AppShell';
 import { ScrollToTopOnNavigate } from './app/ScrollToTopOnNavigate';
 import { SignIn } from './routes/SignIn';
@@ -20,17 +38,33 @@ import { Plan } from './routes/Plan';
 import { Foods } from './routes/Foods';
 import { Tags } from './routes/Tags';
 
-const queryClient = new QueryClient();
+/**
+ * How long the first session check may take before a phone that remembers its session opens from
+ * it. A signal too weak to carry a request leaves `navigator.onLine` true and the check hanging.
+ */
+export const SLOW_SESSION_CHECK_MS = 4_000;
 
 /**
  * Who may see the app: a session, and a household to see it in.
  *
  * A layout route rather than a branch above the router, because one route has to be reachable
  * without either of those and cannot be if the whole router sits behind them.
+ *
+ * With no signal, the session this phone last had stands in for the check that cannot be made, and
+ * only an answer from the server signs anyone out (D56; the rules are in `lib/session-gate.ts`).
  */
 function SessionGate() {
-  const { data: session, isPending } = authClient.useSession();
+  const { data: session, isPending, error: sessionError } = authClient.useSession();
   const activeOrg = authClient.useActiveOrganization();
+  const knownRecord = useSyncExternalStore(subscribeKnownSession, knownSessionSnapshot, () => null);
+  const known = useMemo(() => parseKnownSession(knownRecord), [knownRecord]);
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setSlow(true), SLOW_SESSION_CHECK_MS);
+    return () => clearTimeout(timer);
+  }, []);
+  // Once open from the remembered session, a recheck in flight does not blank the screen.
+  const onKept = useRef(false);
 
   /*
     Ask for the household again once a session appears.
@@ -55,11 +89,99 @@ function SessionGate() {
     void activeOrg.refetch();
   }, [sessionId, activeOrg.isPending, activeOrg.data, activeOrg.refetch]);
 
-  if (isPending) return null;
-  if (!session) return <SignIn />;
-  if (activeOrg.isPending) return null;
-  if (!activeOrg.data) return <Onboarding />; // signed in but no household yet
-  return <Outlet />;
+  const view = decideGate({
+    session: session ? { userId: session.user.id, sessionId: session.session.id } : null,
+    sessionPending: isPending,
+    sessionError,
+    household: activeOrg.data ? { id: activeOrg.data.id } : null,
+    householdPending: activeOrg.isPending,
+    householdError: activeOrg.error,
+    known,
+    signOutPending: pendingSignOut(),
+    preferKnown: !navigator.onLine || slow || onKept.current,
+  });
+  const appSession = view.kind === 'app' ? view.session : null;
+  const offline = view.kind === 'app' && view.offline;
+  const forget = (view.kind === 'sign-in' && view.forget) || view.kind === 'onboarding';
+  const finishing = view.kind === 'finish-sign-out';
+
+  useEffect(() => {
+    onKept.current = offline;
+  }, [offline]);
+
+  /*
+    Back in signal: the auth client asks for the session again by itself, and not for the household,
+    so a household check that failed offline would hold the app on the kept session for good.
+  */
+  const refetchHousehold = activeOrg.refetch;
+  useEffect(() => {
+    if (!offline) return;
+    const onOnline = () => void refetchHousehold();
+    window.addEventListener('online', onOnline);
+    return () => window.removeEventListener('online', onOnline);
+  }, [offline, refetchHousehold]);
+
+  // Confirmed by the server: remember it, so the next start with no signal can open.
+  const fresh = !offline && appSession ? JSON.stringify(appSession) : null;
+  useEffect(() => {
+    if (fresh) rememberSession(JSON.parse(fresh) as KnownSession);
+  }, [fresh]);
+
+  // The server says nobody, or nobody with a household: nothing of anyone's stays on this phone.
+  useEffect(() => {
+    if (!forget) return;
+    leaveScope(queryClient);
+    forgetOfflineData();
+    setPendingSignOut(null);
+  }, [forget]);
+
+  // A sign-out made with no signal, and the server has shown that session again: end it now.
+  const finished = useRef<string | null>(null);
+  useEffect(() => {
+    if (!finishing || !sessionId || finished.current === sessionId) return;
+    finished.current = sessionId;
+    void Promise.resolve(authClient.signOut()).then((result: unknown) => {
+      if (!(result as { error?: unknown } | undefined)?.error) setPendingSignOut(null);
+    });
+  }, [finishing, sessionId]);
+
+  switch (view.kind) {
+    case 'wait':
+      return null;
+    case 'sign-in':
+    case 'finish-sign-out':
+      return <SignIn />;
+    case 'onboarding':
+      return <Onboarding />; // signed in but no household yet
+    case 'app':
+      return (
+        <KeptSessionContext.Provider value={view.offline}>
+          <KeptCopy key={scopeOf(view.session)} scope={scopeOf(view.session)}>
+            <Outlet />
+          </KeptCopy>
+        </KeptSessionContext.Provider>
+      );
+  }
+}
+
+/**
+ * The query cache, restored from and saved to this phone's copy for one session (D56). A list
+ * change still queued from before the app was closed is sent once the copy is back and a signal is.
+ */
+function KeptCopy({ scope, children }: { scope: string; children: ReactNode }) {
+  const persistOptions = useMemo(() => {
+    enterScope(queryClient, scope);
+    return persistOptionsFor(scope);
+  }, [scope]);
+  return (
+    <PersistQueryClientProvider
+      client={queryClient}
+      persistOptions={persistOptions}
+      onSuccess={() => void queryClient.resumePausedMutations()}
+    >
+      {children}
+    </PersistQueryClientProvider>
+  );
 }
 
 export function App() {

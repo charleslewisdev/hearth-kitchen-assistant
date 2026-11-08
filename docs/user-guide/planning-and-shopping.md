@@ -79,9 +79,12 @@ list. A phone with the list open picks up other people's changes within about 5 
 you can shop from the same list at once.
 
 With no signal (a store with patchy reception), ticks, removals and new items still show at once,
-a note says you're offline, and they are sent when the phone reconnects. Keep Hearth open while
-offline: if the page is closed or reloaded before the signal returns, those changes are lost, and
-Hearth can't open at all without a connection.
+a note says you're offline and when the list on screen is from, and the changes are sent when the
+phone reconnects. They are kept if Hearth is closed before then.
+
+Hearth also opens with no signal, if this phone has opened it signed in before: the Shop tab shows
+the list as it was when the phone last had a connection (up to a week old). Other tabs need a
+connection. Signing out removes the phone's copy of the list, along with any changes not yet sent.
 
 Amounts cannot be edited on the list. To change one, remove the item and add it again by hand.
 

@@ -3,6 +3,12 @@ import { render, screen, cleanup } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { App } from './App';
 import { authClient } from './lib/auth';
+import {
+  pendingSignOut,
+  readKnownSession,
+  rememberSession,
+  setPendingSignOut,
+} from './lib/offline';
 
 // The gate is the whole subject here, so nothing below it needs a real tRPC client: the three
 // screens these tests reach (sign in, onboarding, accept invite) do not call one.
@@ -49,6 +55,7 @@ function renderAt(path: string) {
 }
 
 beforeEach(() => {
+  localStorage.clear();
   refetch = vi.fn();
   getInvitation.mockResolvedValue({ data: null, error: { status: 400 } });
 });
@@ -110,5 +117,68 @@ describe('App routing', () => {
 
     expect(refetch).not.toHaveBeenCalled();
     expect(screen.getByRole('heading', { name: 'Plan' })).toBeInTheDocument();
+  });
+});
+
+describe('App with no signal (D56)', () => {
+  const offline = { data: null, isPending: false, error: new TypeError('Failed to fetch') };
+
+  it('opens from the remembered session when the session check cannot reach the server', async () => {
+    rememberSession({ userId: 'user-1', householdId: 'org-1', sessionId: 'session-1' });
+    useSession.mockReturnValue(offline);
+    useActiveOrganization.mockReturnValue({ ...offline, refetch });
+
+    renderAt('/plan');
+
+    expect(await screen.findByRole('heading', { name: 'Plan' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Sign in to Hearth' })).not.toBeInTheDocument();
+  });
+
+  it('shows sign-in, and keeps nothing, when unreachable on a phone that remembers no one', () => {
+    useSession.mockReturnValue(offline);
+    useActiveOrganization.mockReturnValue({ ...offline, refetch });
+
+    renderAt('/plan');
+
+    expect(screen.getByRole('heading', { name: 'Sign in to Hearth' })).toBeInTheDocument();
+  });
+
+  it('forgets the kept list when the server says nobody is signed in', () => {
+    rememberSession({ userId: 'user-1', householdId: 'org-1', sessionId: 'session-1' });
+    localStorage.setItem('hearth.offline.cache', '{}');
+    useSession.mockReturnValue(noSession());
+    useActiveOrganization.mockReturnValue(household(null));
+
+    renderAt('/');
+
+    expect(screen.getByRole('heading', { name: 'Sign in to Hearth' })).toBeInTheDocument();
+    expect(readKnownSession()).toBeNull();
+    expect(localStorage.getItem('hearth.offline.cache')).toBeNull();
+  });
+
+  it('remembers a session the server confirmed', () => {
+    useSession.mockReturnValue({ ...session(), isPending: false });
+    useActiveOrganization.mockReturnValue(household({ id: 'org-1', name: 'The Bell Kitchen' }));
+
+    renderAt('/plan');
+
+    expect(readKnownSession()).toEqual({
+      userId: 'user-1',
+      householdId: 'org-1',
+      sessionId: 'session-1',
+    });
+  });
+
+  it('ends a sign-out made offline once the server shows that session again', async () => {
+    setPendingSignOut('session-1');
+    (authClient.signOut as unknown as Mock).mockResolvedValue({ data: {}, error: null });
+    useSession.mockReturnValue({ ...session(), isPending: false });
+    useActiveOrganization.mockReturnValue(household({ id: 'org-1', name: 'The Bell Kitchen' }));
+
+    renderAt('/plan');
+
+    expect(screen.getByRole('heading', { name: 'Sign in to Hearth' })).toBeInTheDocument();
+    expect(authClient.signOut).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(pendingSignOut()).toBeNull());
   });
 });

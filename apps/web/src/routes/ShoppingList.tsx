@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { formatQuantity, shoppingQuantity, unitLabel } from '@hearth/shared';
 import { trpc } from '../lib/trpc';
 import { departmentStyle } from '../lib/departments';
+import { useOnKeptSession } from '../lib/offline-context';
+import { keptListTime } from '../lib/kept-list-time';
 import styles from './ShoppingList.module.css';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
 
@@ -54,6 +56,12 @@ function groupByDepartment(items: Item[]): Array<{ department: string; items: It
 
   if (other) sections.push({ department: 'Other', items: other });
   return sections;
+}
+
+/** The server said no to this session, as opposed to not being reached: the list is not theirs. */
+function refusedByServer(error: unknown): boolean {
+  const code = (error as { data?: { code?: string } } | null)?.data?.code;
+  return code === 'UNAUTHORIZED' || code === 'FORBIDDEN';
 }
 
 /** How often an open list picks up another device's changes. */
@@ -145,7 +153,11 @@ export function ShoppingList() {
   const clearChecked = trpc.shoppingList.clearChecked.useMutation(
     optimistic<void>((items) => items.filter((i) => !i.checked)),
   );
-  const online = useOnline();
+  // Offline per the browser, or open from this phone's copy because the server could not be
+  // reached (D56), which is also what a signal too weak to carry a request looks like.
+  const browserOnline = useOnline();
+  const onKeptSession = useOnKeptSession();
+  const online = browserOnline && !onKeptSession;
 
   const [text, setText] = useState('');
 
@@ -158,16 +170,22 @@ export function ShoppingList() {
     setText('');
   }
 
-  if (query.isLoading) {
+  // Nothing to show yet. Paused rather than loading when there is no signal and no copy here.
+  if (query.isPending) {
     return (
       <section className={styles.screen}>
         <h1 className={styles.title}>Shopping list</h1>
-        <p className={styles.status}>Loading your list…</p>
+        <p className={styles.status} role="status">
+          {query.fetchStatus === 'paused'
+            ? 'You’re offline, and this phone has no copy of your list yet. It will load when the connection comes back.'
+            : 'Loading your list…'}
+        </p>
       </section>
     );
   }
 
-  if (query.isError) {
+  // A failed refresh keeps the list it already had on screen, unless the server refused it.
+  if (query.isError && (!query.data || refusedByServer(query.error))) {
     return (
       <section className={styles.screen}>
         <h1 className={styles.title}>Shopping list</h1>
@@ -210,7 +228,8 @@ export function ShoppingList() {
 
       {!online && (
         <p className={styles.offline} role="status">
-          You’re offline. Changes you make here will be saved when the connection comes back.
+          You’re offline. Showing your list from {keptListTime(query.dataUpdatedAt)}. Changes you
+          make here will be saved when the connection comes back.
         </p>
       )}
 

@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { authClient } from '../lib/auth';
+import { signOut } from '../lib/sign-out';
 import styles from './Entry.module.css';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
 
@@ -181,11 +182,7 @@ export function AcceptInvite() {
               You are signed in as {session.user.email}, and this invitation was sent to a different
               address. Sign out and open the link again to use it.
             </p>
-            <button
-              type="button"
-              className={styles.secondary}
-              onClick={() => void authClient.signOut()}
-            >
+            <button type="button" className={styles.secondary} onClick={() => void signOut()}>
               Sign out
             </button>
           </>

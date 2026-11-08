@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { slugify } from '@hearth/shared';
 import { ONE_HOUSEHOLD_MESSAGE } from '@hearth/server/src/messages';
 import { authClient } from '../lib/auth';
+import { signOut } from '../lib/sign-out';
 import styles from './Entry.module.css';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
 
@@ -60,11 +61,7 @@ export function Onboarding() {
           An invitation arrives by email, and its link is what puts you in. If you had one and it
           did not work, ask the owner to send it again.
         </p>
-        <button
-          type="button"
-          className={styles.secondary}
-          onClick={() => void authClient.signOut()}
-        >
+        <button type="button" className={styles.secondary} onClick={() => void signOut()}>
           Sign out
         </button>
       </main>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { NOT_A_MEMBER_MESSAGE } from '@hearth/server/src/messages';
 import { authClient } from '../lib/auth';
+import { signOut } from '../lib/sign-out';
 import { trpc } from '../lib/trpc';
 import { WeekStartSetting } from './WeekStartSetting';
 import styles from './Household.module.css';
@@ -97,7 +98,7 @@ export function Household() {
     invitations.error?.message === NOT_A_MEMBER_MESSAGE;
 
   useEffect(() => {
-    if (lostMembership) void authClient.signOut();
+    if (lostMembership) void signOut();
   }, [lostMembership]);
 
   const viewerId = session?.user.id;
@@ -401,11 +402,7 @@ export function Household() {
       <WeekStartSetting />
 
       <div className={styles.section}>
-        <button
-          type="button"
-          className={styles.secondary}
-          onClick={() => void authClient.signOut()}
-        >
+        <button type="button" className={styles.secondary} onClick={() => void signOut()}>
           Sign out
         </button>
       </div>

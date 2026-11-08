@@ -46,8 +46,8 @@ and the two XML templates. Container lifecycle is the owner's. Then load real re
 collect what breaks.
 
 **Known gaps**, none blocking launch: ranges keep only their low end; a servings change after
-Build shopping list does not reach the list (D44); the app cannot cold-start offline; a page
-with two recipes on it is read as one.
+Build shopping list does not reach the list (D44); offline edits on two phones have no
+conflict rule yet (#11); a page with two recipes on it is read as one.
 
 ## Phases
 
