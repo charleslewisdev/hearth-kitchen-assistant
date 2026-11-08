@@ -5,9 +5,9 @@ import {
   itemMergeKey,
   isNeverBought,
   parseIngredientLine,
-  type ListAmount,
   type ScalingMode,
 } from '@hearth/shared';
+import type { ListAmount } from '@hearth/shared';
 import {
   shoppingList,
   shoppingListItem,
