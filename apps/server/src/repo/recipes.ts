@@ -356,6 +356,8 @@ export async function createRecipe(
   input: CreateRecipeInput & {
     /** The photo or PDF import this recipe was saved from (`import-drafts.ts`). */
     importDraftId?: string;
+    /** The household's rating, 1 to 5, which a Markdown import carries over (D52). */
+    rating?: number | null;
   },
 ): Promise<{ id: string; slug: string }> {
   const { title, servings = 1, mealTypes = [] } = input;
@@ -372,6 +374,7 @@ export async function createRecipe(
         servings,
         mealTypes,
         ...optionalDetails(input),
+        ...(input.rating != null ? { rating: input.rating } : {}),
       })
       .returning({ id: recipe.id, slug: recipe.slug });
     const { id } = created!;

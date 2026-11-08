@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   draftFromHtml,
   draftFromImages,
+  draftFromMarkdown,
   draftFromPdf,
   draftFromText,
   fetchPage,
@@ -260,11 +261,17 @@ export function createImportRouter(fetch: PageFetcher = fetchPage) {
      *
      * The only source with no decoder in front of it, and the one that always works: it is what
      * a paywalled page, a screenshot's caption, or an email from a relative comes in as.
+     *
+     * Text that opens with front matter is a Markdown recipe (D52), a Hearth export or a file
+     * written in its format, and is read field for field rather than guessed at. The Import
+     * screen's Markdown tile reads the file in the browser and sends its text here, so a file
+     * and a paste are the one path. Anything else, Markdown without front matter included, goes
+     * to the text heuristics as before.
      */
     fromText: protectedProcedure
       .input(z.object({ text: z.string().min(1).max(MAX_TEXT_LENGTH) }))
       .mutation(({ input }): ImportedDraft => {
-        const draft = draftFromText(input.text, { kind: 'text' });
+        const draft = draftFromMarkdown(input.text) ?? draftFromText(input.text, { kind: 'text' });
         if (!draft) refuse(NO_RECIPE_IN_TEXT_MESSAGE);
         return { ...draft, importDraftId: null };
       }),
