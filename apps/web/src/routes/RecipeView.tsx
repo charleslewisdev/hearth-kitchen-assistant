@@ -352,6 +352,15 @@ export function RecipeView() {
 
       <PlanThisRecipe recipeId={recipeId} servings={servings} />
 
+      {/* The recipe as a Markdown file (D52), which any Hearth can import again. A plain link:
+          the server names the file and the browser downloads it, on a phone too. Down here
+          rather than beside Share and Print, where a fourth pill crowds a phone's header. */}
+      <div className={styles.exportRow}>
+        <a href={`/api/export/recipes/${recipeId}`} download className={styles.secondaryButton}>
+          Download as Markdown
+        </a>
+      </div>
+
       {/* An in-page confirmation rather than window.confirm, which blocks the tab. */}
       <div className={styles.dangerZone}>
         {confirmingDelete ? (

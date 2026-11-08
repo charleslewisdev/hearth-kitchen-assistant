@@ -221,6 +221,13 @@
   white-space: nowrap;
 }
 
+/* The export download: a link that looks like the secondary button. */
+.secondaryLink {
+  composes: secondary;
+  display: inline-block;
+  text-decoration: none;
+}
+
 .danger {
   background: var(--color-leftover-bg);
   color: var(--color-leftover-text);
