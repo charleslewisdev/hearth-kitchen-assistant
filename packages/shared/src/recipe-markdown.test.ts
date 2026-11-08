@@ -10,6 +10,7 @@ import {
 const rich: MarkdownRecipe = {
   title: 'Charred Fennel & "Smoky" Toast: Take 2',
   servings: 6,
+  servingsHigh: 8,
   prepMinutes: 15,
   cookMinutes: 40,
   types: ['dinner', 'side'],
@@ -41,6 +42,7 @@ describe('recipeToMarkdown', () => {
         'hearth_format: 1',
         'title: "Charred Fennel & \\"Smoky\\" Toast: Take 2"',
         'servings: 6',
+        'servings_high: 8',
         'prep_minutes: 15',
         'cook_minutes: 40',
         'types: ["dinner", "side"]',
@@ -83,6 +85,7 @@ describe('recipeToMarkdown', () => {
     const md = recipeToMarkdown({
       title: 'Toast',
       servings: 1,
+      servingsHigh: null,
       prepMinutes: null,
       cookMinutes: null,
       types: [],
@@ -113,6 +116,7 @@ describe('parseRecipeMarkdown', () => {
     const bare: MarkdownRecipe = {
       title: 'Toast',
       servings: 1,
+      servingsHigh: null,
       prepMinutes: null,
       cookMinutes: null,
       types: [],
@@ -200,6 +204,7 @@ describe('parseRecipeMarkdown', () => {
     expect(parseRecipeMarkdown(md)).toEqual({
       title: 'Weeknight Beans',
       servings: 3,
+      servingsHigh: null,
       prepMinutes: null,
       cookMinutes: null,
       types: ['dinner', 'lunch'],
@@ -232,12 +237,41 @@ describe('parseRecipeMarkdown', () => {
     ].join('\n');
     expect(parseRecipeMarkdown(md)).toMatchObject({
       servings: 1,
+      servingsHigh: null,
       prepMinutes: null,
       cookMinutes: null,
       rating: null,
       sourceUrl: null,
       types: [],
     });
+  });
+
+  it('reads a hand-written range of servings, quoted or bare', () => {
+    expect(parseRecipeMarkdown('---\nservings: 4\nservings_high: 6\n---\n')?.servingsHigh).toBe(6);
+    expect(parseRecipeMarkdown("---\nservings: '4'\nservings_high: '6'\n---\n")).toMatchObject({
+      servings: 4,
+      servingsHigh: 6,
+    });
+    // A file with only the key is still a recipe's front matter.
+    expect(parseRecipeMarkdown('---\nservings_high: 6\n---\n')).not.toBeNull();
+  });
+
+  it('drops a servings range the API would refuse or not store', () => {
+    const high = (front: string) => parseRecipeMarkdown(`---\n${front}\n---\n`)?.servingsHigh;
+    // Not above the servings: "4 to 4" is just 4, and a range never runs downward.
+    expect(high('servings: 4\nservings_high: 4')).toBeNull();
+    expect(high('servings: 4\nservings_high: 3')).toBeNull();
+    // Over the cap `recipe.create` puts on it, and anything not a whole number.
+    expect(high('servings: 4\nservings_high: 10000')).toBe(10_000);
+    expect(high('servings: 4\nservings_high: 10001')).toBeNull();
+    expect(high('servings: 4\nservings_high: 5.5')).toBeNull();
+    expect(high('servings: 4\nservings_high: six')).toBeNull();
+    expect(high('servings: 4\nservings_high: [6]')).toBeNull();
+    // No low end stated (or one that was dropped): no range, rather than one from the fallback 1.
+    expect(high('servings_high: 6')).toBeNull();
+    expect(high('servings: 0\nservings_high: 6')).toBeNull();
+    // A count past the cap can have no high end under it.
+    expect(high('servings: 20000\nservings_high: 30000')).toBeNull();
   });
 
   it('stays linear on hostile input, each shape on its own clock', () => {
@@ -249,6 +283,10 @@ describe('parseRecipeMarkdown', () => {
       ['bare flow list items', `---\ntags: [${'a,'.repeat(24_000)}a]\n---\n`],
       ['a long block list', '---\ntags:\n' + '  - x\n'.repeat(8_000) + '---\n'],
       ['front matter just over the cap', '---\ntitle: x\n' + 'a'.repeat(50_000) + '\n---\n'],
+      [
+        'a run of digits as a range',
+        '---\nservings: 4\nservings_high: ' + '9'.repeat(49_000) + '\n---\n',
+      ],
       ['a run of colons', '---\n' + ':'.repeat(49_000) + '\ntitle: x\n---\n'],
       ['digits before a marker', '---\ntitle: x\n---\n## Method\n' + '1'.repeat(100_000) + '. x\n'],
       ['spaces before a step', '---\ntitle: x\n---\n## Method\n' + ' '.repeat(100_000) + 'x\n'],

@@ -85,8 +85,8 @@ import again ([Importing a Markdown file](importing.md#markdown-a-recipe-exporte
 - **Every recipe:** on **More**, under **Your recipes**, press **Export all recipes**. You get a
   zip with one file per recipe.
 
-The files hold the recipe at its own servings, with everything you typed: title, servings, times,
-types, tags, rating, source, notes, ingredients and steps. Photos and the cook log are not
+The files hold the recipe at its own servings, with everything you typed: title, servings (both
+ends of a range such as 4 to 6), times, types, tags, rating, source, notes, ingredients and steps. Photos and the cook log are not
 included.
 
 ## Rating and the cook log

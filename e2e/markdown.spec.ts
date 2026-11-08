@@ -16,6 +16,7 @@ const MARKDOWN = `---
 hearth_format: 1
 title: "Smoky Barley Bowl"
 servings: 3
+servings_high: 5
 prep_minutes: 10
 cook_minutes: 30
 types: ["dinner", "side"]
@@ -91,6 +92,9 @@ test('export a recipe as Markdown, import it back, and export the same file agai
   await page.getByRole('button', { name: 'Import' }).click();
   await expect(page.getByLabel('Title')).toHaveValue('Smoky Barley Bowl');
   await expect(page.getByLabel('Source link')).toHaveValue('https://example.com/barley-bowl');
+  // The servings range fills both boxes, so it survives the save and the export.
+  await expect(page.getByLabel('Servings', { exact: true })).toHaveValue('3');
+  await expect(page.getByLabel(/^Up to/)).toHaveValue('5');
   await saveReviewed(page);
 
   // 2. Download it. The file is the pasted text, field for field.

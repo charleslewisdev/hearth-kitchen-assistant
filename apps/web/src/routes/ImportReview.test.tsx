@@ -531,6 +531,7 @@ describe('a Markdown file exported from Hearth', () => {
     makeDraft({
       title: { value: 'Barley Pilaf', confidence: 'high', raw: 'Barley Pilaf' },
       servings: { value: 4, confidence: 'high', raw: '4' },
+      servingsHigh: 6,
       mealTypes: { value: ['side'], confidence: 'high', raw: 'side' },
       // Neither is a tag this household uses yet: a file's tags are the recipe's own, not hints.
       tags: { value: ['grains', 'make ahead'], confidence: 'high', raw: 'grains, make ahead' },
@@ -559,13 +560,14 @@ describe('a Markdown file exported from Hearth', () => {
   it('saves every field the file stated, exactly, through recipe.create', async () => {
     renderReview(markdownDraft());
     expect(screen.queryByText(/worked out rather than stated/i)).not.toBeInTheDocument();
+    // The file's `servings_high` fills the Up to box, so the range is saved as it was exported.
+    expect(screen.getByLabelText(/up to/i)).toHaveValue(6);
     fireEvent.click(screen.getByRole('button', { name: /save recipe/i }));
     await waitFor(() => expect(mutateAsync).toHaveBeenCalled());
     expect(mutateAsync).toHaveBeenCalledWith({
       title: 'Barley Pilaf',
       servings: 4,
-      // The Markdown format has no servings range yet, so the review sends none.
-      servingsHigh: null,
+      servingsHigh: 6,
       mealTypes: ['side'],
       tags: ['grains', 'make ahead'],
       ingredientLines: ['1 cup pearl barley', '2 cups stock [[House Stock]]'],
