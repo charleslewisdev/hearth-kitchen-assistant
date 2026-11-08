@@ -67,8 +67,9 @@ message by source. In short:
 
 ### I cannot import a Word document
 
-Word files are not supported. Copy the text and use **Text**, or save the document as a PDF from
-Word and use **PDF**.
+Hearth reads `.docx` files on the **PDF or Word** tile. It cannot read the older `.doc` format or a
+password-protected document: open it in Word and save it as `.docx`, or copy the text and use
+**Text**. See [Word documents](importing.md#word-documents).
 
 ### How do I delete a recipe?
 
@@ -92,7 +93,6 @@ For the list you already have, remove the extra lines and add the right amount b
 
 Check the line on the recipe's **Edit** screen. Common causes:
 
-- A range such as "2 to 3 cups" keeps only the low end, 2.
 - A unit Hearth does not know becomes part of the food name. The Adding recipes page lists the ones it knows.
 - A vague amount ("a few sprigs") is not read at all.
 

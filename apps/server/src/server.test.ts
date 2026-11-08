@@ -11,7 +11,7 @@ import { resetDb, sessionIpFor, verifyEmail } from '../test/db';
 import { capture } from '../test/logs';
 import { bootstrapHeaders, signUpWithHousehold } from '../test/session';
 import { publicConfig } from './config';
-import { MAX_TRPC_BATCH } from '@hearth/shared';
+import { base64Length, MAX_DOCX_BYTES, MAX_TRPC_BATCH } from '@hearth/shared';
 
 let app: FastifyInstance;
 beforeAll(async () => {
@@ -1154,6 +1154,17 @@ describe('the body an import upload needs', () => {
       payload: body(2 * 1024 * 1024),
     });
     expect(res.statusCode).not.toBe(413);
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('takes the largest Word document an import accepts', async () => {
+    // The body limit is derived from every upload cap, the Word document's included.
+    const res = await app.inject({
+      method: 'POST',
+      url: '/trpc/import.fromDocx',
+      headers: { 'content-type': 'application/json' },
+      payload: body(base64Length(MAX_DOCX_BYTES)),
+    });
     expect(res.statusCode).toBe(401);
   });
 

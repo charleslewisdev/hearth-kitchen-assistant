@@ -27,8 +27,8 @@ from photos, happens on your own server.
 | ---------------------------------------------------- | ------------------- | ---------------------------------------------------------------- |
 | [Getting started](getting-started.md)                | The owner           | First boot, the setup token, creating the household, inviting    |
 | [Adding recipes by hand](adding-recipes.md)          | Everyone            | The recipe form, how ingredient lines are read, steps and timers |
-| [Importing recipes](importing.md)                    | Everyone            | Links, pasted text, PDFs, photos, and a plan for cookbooks       |
-| [Cooking](cooking.md)                                | Everyone            | Finding a recipe, scaling, sending a recipe, cook mode, timers   |
+| [Importing recipes](importing.md)                    | Everyone            | Links, pasted text, PDFs, photos, Markdown, a plan for cookbooks |
+| [Cooking](cooking.md)                                | Everyone            | Finding, scaling, sending and exporting a recipe, cook mode      |
 | [Planning and shopping](planning-and-shopping.md)    | Everyone            | The shopping list and the meal planner                           |
 | [Questions and problems](faq.md)                     | Everyone            | Sign-in trouble, expired invitations, failed imports             |
 

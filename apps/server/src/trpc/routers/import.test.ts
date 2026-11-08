@@ -7,9 +7,10 @@ import { TRPCError } from '@trpc/server';
 import { getHTTPStatusCodeFromError } from '@trpc/server/http';
 import type { FetchPageResult } from '@hearth/enrichment';
 import { MAX_URL_LENGTH } from '@hearth/enrichment';
-import { base64Length, MAX_PDF_BYTES, MAX_TEXT_LENGTH } from '@hearth/shared';
+import { base64Length, MAX_DOCX_BYTES, MAX_PDF_BYTES, MAX_TEXT_LENGTH } from '@hearth/shared';
 import {
   createImportRouter,
+  DOCX_FAILURE_MESSAGES,
   IMAGE_FAILURE_MESSAGES,
   IMPORT_FAILURE_MESSAGES,
   KEPT_REASONS,
@@ -279,6 +280,39 @@ Soften the onion in the oil, add the lentils and the stock, and simmer for half 
     expect(draft.ingredientLines.confidence).toBe('low');
   });
 
+  it('reads text with front matter as a Markdown recipe, stated field for field', async () => {
+    const caller = await uploadCaller();
+    const draft = await caller.import.fromText({
+      text: '---\ntitle: "Lentil Soup"\nservings: 4\nrating: 5\n---\n## Ingredients\n- 1 cup brown lentils\n## Method\n1. Simmer.\n',
+    });
+    expect(draft.source).toEqual({
+      kind: 'markdown',
+      sourceName: null,
+      sourceUrl: null,
+      rating: 5,
+    });
+    expect(draft.title).toEqual({ value: 'Lentil Soup', confidence: 'high', raw: 'Lentil Soup' });
+    expect(draft.ingredientLines.value).toEqual(['1 cup brown lentils']);
+    expect(draft.steps.value).toEqual(['Simmer.']);
+    expect(await caller.recipe.list()).toEqual([]);
+  });
+
+  it('sends Markdown without front matter through the text heuristics, as before', async () => {
+    const caller = await uploadCaller();
+    const draft = await caller.import.fromText({
+      text: `# Weeknight Lentil Soup\n\n## Ingredients\n\n- 2 Tbsp olive oil\n- 1 cup brown lentils\n\n## Method\n\n1. Simmer for half an hour.`,
+    });
+    expect(draft.source).toEqual({ kind: 'text' });
+    expect(draft.ingredientLines.value.length).toBeGreaterThan(0);
+  });
+
+  it('sends a paste that opens with a horizontal rule to the text heuristics', async () => {
+    const caller = await uploadCaller();
+    const draft = await caller.import.fromText({ text: `---\n${PASTED}\n---\n` });
+    expect(draft.source).toEqual({ kind: 'text' });
+    expect(draft.ingredientLines.value).toHaveLength(4);
+  });
+
   it('says so when the text had no recipe in it', async () => {
     const caller = await uploadCaller();
     await expect(
@@ -424,6 +458,126 @@ describe('import.fromPdf', () => {
   });
 });
 
+describe('import.fromDocx', () => {
+  beforeEach(resetDb);
+
+  it('turns an uploaded Word document into a draft, and keeps no draft row', async () => {
+    const caller = await uploadCaller();
+    const draft = await caller.import.fromDocx({ fileBase64: upload('word-recipe.docx') });
+
+    expect(draft.title.value).toBe('Brown Butter Oat Bars');
+    expect(draft.ingredientLines.value).toContain('2 cups rolled oats');
+    expect(draft.steps.value).toHaveLength(4);
+    expect(draft.source).toEqual({ kind: 'docx' });
+    // Read like a paste: deterministic text, so there is no first draft worth studying (D55).
+    expect(draft.importDraftId).toBeNull();
+    expect(await keptDrafts()).toEqual([]);
+    expect(await caller.recipe.list()).toEqual([]);
+  });
+
+  it('has a different sentence for every Word failure', () => {
+    const messages = Object.values(DOCX_FAILURE_MESSAGES);
+    expect(new Set(messages).size).toBe(messages.length);
+  });
+
+  it('tells a cook with an old .doc what to do instead, and keeps nothing', async () => {
+    const { householdId } = await householdWithOwner();
+    const { sink, lines } = capture();
+    const caller = routerWith(async () => ({ ok: false, reason: 'unreachable' })).createCaller(
+      testContext({
+        householdId,
+        session: { userId: 'u' } as never,
+        log: createLogger({ level: 'info', pretty: false, destination: sink }),
+      }),
+    );
+    const ole = Buffer.alloc(512);
+    Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]).copy(ole);
+    const error = await caller.import
+      .fromDocx({ fileBase64: ole.toString('base64') })
+      .catch((e: unknown) => e);
+    expect((error as TRPCError).message).toBe(DOCX_FAILURE_MESSAGES['old-format']);
+    expect((error as TRPCError).message).toMatch(/\.docx/);
+    expect(getHTTPStatusCodeFromError(error as TRPCError)).toBeLessThan(500);
+    expect(lines().some((l) => l.msg === 'import failed; upload kept')).toBe(false);
+  });
+
+  it('keeps a document it could not read, as it arrived, with why', async () => {
+    const { householdId } = await householdWithOwner();
+    const { sink, lines } = capture();
+    const caller = routerWith(async () => ({ ok: false, reason: 'unreachable' })).createCaller(
+      testContext({
+        householdId,
+        session: { userId: 'u' } as never,
+        log: createLogger({ level: 'info', pretty: false, destination: sink }),
+      }),
+    );
+    const notADocx = Buffer.from('Nanas Rhubarb Fool, 2 cups rhubarb');
+    await expect(
+      caller.import.fromDocx({ fileBase64: notADocx.toString('base64') }),
+    ).rejects.toThrow(DOCX_FAILURE_MESSAGES.malformed);
+
+    const warned = lines().find((l) => l.msg === 'import failed; upload kept');
+    expect(warned).toMatchObject({ kind: 'docx', reason: 'malformed' });
+    const dir = join(importFailuresRoot(), householdId, String(warned?.failureId));
+    expect(readFileSync(join(dir, 'page-1.docx'))).toEqual(notADocx);
+    const written = JSON.stringify(lines());
+    expect(written).not.toContain('Rhubarb');
+    expect(written).not.toContain(notADocx.toString('base64').slice(0, 16));
+  });
+
+  it('keeps a document with no recipe in it, with the text it read', async () => {
+    const { householdId } = await householdWithOwner();
+    const { sink, lines } = capture();
+    const caller = routerWith(async () => ({ ok: false, reason: 'unreachable' })).createCaller(
+      testContext({
+        householdId,
+        session: { userId: 'u' } as never,
+        log: createLogger({ level: 'info', pretty: false, destination: sink }),
+      }),
+    );
+    await expect(
+      caller.import.fromDocx({ fileBase64: upload('word-no-recipe.docx') }),
+    ).rejects.toThrow(DOCX_FAILURE_MESSAGES['no-recipe']);
+
+    const warned = lines().find((l) => l.msg === 'import failed; upload kept');
+    expect(warned).toMatchObject({ kind: 'docx', reason: 'no-recipe' });
+    const dir = join(importFailuresRoot(), householdId, String(warned?.failureId));
+    expect(readFileSync(join(dir, 'text.txt'), 'utf8')).toContain('repaint the shed');
+    expect(JSON.stringify(lines())).not.toContain('shed');
+  });
+
+  it('refuses an upload over the size cap at the input, before decoding it', async () => {
+    const caller = await uploadCaller();
+    const tooLong = 'A'.repeat(base64Length(MAX_DOCX_BYTES) + 4);
+    const error = await caller.import.fromDocx({ fileBase64: tooLong }).catch((e: unknown) => e);
+    expect((error as TRPCError).code).toBe('BAD_REQUEST');
+  });
+
+  it('refuses an upload that is not base64 at all', async () => {
+    const caller = await uploadCaller();
+    await expect(caller.import.fromDocx({ fileBase64: 'not base64!!' })).rejects.toThrow(
+      UNREADABLE_UPLOAD_MESSAGE,
+    );
+  });
+
+  it('logs nothing off a document it read', async () => {
+    const { householdId } = await householdWithOwner();
+    const { sink, lines } = capture();
+    const caller = routerWith(async () => ({ ok: false, reason: 'unreachable' })).createCaller(
+      testContext({
+        householdId,
+        session: { userId: 'u' } as never,
+        log: createLogger({ level: 'debug', pretty: false, destination: sink }),
+      }),
+    );
+    await caller.import.fromDocx({ fileBase64: upload('word-recipe.docx') });
+    const written = JSON.stringify(lines());
+    expect(written).not.toContain('Oat Bars');
+    expect(written).not.toContain('rolled oats');
+    expect(lines().some((l) => l['path'] === 'import.fromDocx')).toBe(true);
+  });
+});
+
 describe('import.fromImage', () => {
   beforeEach(resetDb);
 
@@ -504,7 +658,7 @@ describe('import.fromImage', () => {
 describe('the other sources: who may call them, and what is logged', () => {
   beforeEach(resetDb);
 
-  it.each(['fromText', 'fromPdf', 'fromImage'] as const)(
+  it.each(['fromText', 'fromPdf', 'fromDocx', 'fromImage'] as const)(
     '%s refuses a caller with no session',
     async (procedure) => {
       const caller = routerWith(async () => ({ ok: false, reason: 'unreachable' })).createCaller(

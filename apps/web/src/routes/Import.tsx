@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
+  MAX_DOCX_BYTES,
   MAX_IMAGE_BYTES,
   MAX_IMAGE_IMPORT_BYTES,
   MAX_IMAGES_PER_IMPORT,
   MAX_PDF_BYTES,
   MAX_TEXT_LENGTH,
 } from '@hearth/shared';
+import { OLD_WORD_DOCUMENT_MESSAGE } from '@hearth/server/src/messages';
 import { trpc } from '../lib/trpc';
 import { downscaleForOcr, toBase64 } from '../lib/image-upload';
 import { ImportReview, type SourceFiles } from './ImportReview';
@@ -42,8 +44,12 @@ type OpenField = 'link' | 'text' | null;
  */
 const TOO_LARGE = {
   pdf: 'That PDF is too large to import. Try saving just the recipe pages.',
+  docx: 'That document is too large to import. Copy just the recipe into a new document.',
   image: 'That photo is too large to import. Take it again at a smaller size.',
 } as const;
+
+const MARKDOWN_TOO_LONG = 'That file is too long to import. Hearth reads one recipe per file.';
+const MARKDOWN_EMPTY = 'There is nothing in that file.';
 
 const TOO_MANY_PHOTOS = `Choose up to ${MAX_IMAGES_PER_IMPORT} photos for one recipe.`;
 const PHOTOS_TOO_LARGE = 'Those photos are too large together. Try fewer, or retake them smaller.';
@@ -63,6 +69,21 @@ export function defaultPageOrder(files: File[]): File[] {
   return [...files].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
 }
 
+/** The `.docx` media type, which a phone's picker may report where a file name has no extension. */
+const DOCX_TYPE = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+/**
+ * What the PDF tile's file is: a PDF, a Word document, or the old binary `.doc` Hearth cannot
+ * read. By name and media type; the server checks the bytes again, and answers a mislabelled
+ * file with its own sentence.
+ */
+export function documentKind(file: File): 'pdf' | 'docx' | 'doc' {
+  const name = file.name.toLowerCase();
+  if (name.endsWith('.docx') || file.type === DOCX_TYPE) return 'docx';
+  if (name.endsWith('.doc') || file.type === 'application/msword') return 'doc';
+  return 'pdf';
+}
+
 /** One photo in the Pages step. The id keeps React's identity for it as it moves. */
 interface ChosenPage {
   id: number;
@@ -70,6 +91,16 @@ interface ChosenPage {
 }
 
 let nextPageId = 0;
+
+/** A file's text, as UTF-8. FileReader, as `toBase64` uses, rather than `Blob.text()`. */
+function readText(file: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error('the file could not be read'));
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+    reader.readAsText(file, 'utf-8');
+  });
+}
 
 /**
  * A small preview of one page, so the cook can tell the pages apart by more than a file name.
@@ -107,12 +138,13 @@ export function Import() {
   const fromUrl = trpc.import.fromUrl.useMutation();
   const fromText = trpc.import.fromText.useMutation();
   const fromPdf = trpc.import.fromPdf.useMutation();
+  const fromDocx = trpc.import.fromDocx.useMutation();
   const fromImage = trpc.import.fromImage.useMutation();
-  const sources = [fromUrl, fromText, fromPdf, fromImage];
+  const sources = [fromUrl, fromText, fromPdf, fromDocx, fromImage];
 
   // The draft lives here, in memory, and is deliberately not a route of its own: it is unsaved
   // work, and a URL that could be reloaded would either lose it or re-fetch the page.
-  const draft = fromUrl.data ?? fromText.data ?? fromPdf.data ?? fromImage.data;
+  const draft = fromUrl.data ?? fromText.data ?? fromPdf.data ?? fromDocx.data ?? fromImage.data;
   const busy = reading || sources.some((source) => source.isPending);
   // The server's own sentence, which is written for a cook. Never a stack trace, and never
   // "something went wrong": a blocked address, a scanned PDF and a photo of a signpost are
@@ -142,21 +174,59 @@ export function Import() {
   /**
    * Read a chosen file and send it.
    *
-   * A photo is reduced first (see `image-upload.ts`); a PDF is sent as it is, because there is
-   * nothing to reduce in a text layer. The size check happens AFTER the reduction, so a cook is
-   * only told a photo is too big when it is still too big once shrunk.
+   * A photo is reduced first (see `image-upload.ts`); a PDF or Word document is sent as it is,
+   * because there is nothing to reduce in a text layer. The size check happens AFTER the
+   * reduction, so a cook is only told a photo is too big when it is still too big once shrunk.
+   *
+   * A Word document shares the PDF tile, and only a PDF is kept with the saved recipe: a
+   * document's text is the recipe, as a paste's is, and keeping it would need a new kind of file.
    */
-  async function importFile(kind: 'pdf', file: File | undefined) {
+  async function importFile(file: File | undefined) {
     if (!file) return;
     forget();
+    const kind = documentKind(file);
+    if (kind === 'doc') {
+      setFileProblem(OLD_WORD_DOCUMENT_MESSAGE);
+      return;
+    }
     setReading(true);
     try {
-      if (file.size > MAX_PDF_BYTES) {
+      if (file.size > (kind === 'docx' ? MAX_DOCX_BYTES : MAX_PDF_BYTES)) {
         setFileProblem(TOO_LARGE[kind]);
+        return;
+      }
+      if (kind === 'docx') {
+        fromDocx.mutate({ fileBase64: await toBase64(file) });
         return;
       }
       setSourceFiles({ kind: 'pdf', file });
       fromPdf.mutate({ fileBase64: await toBase64(file) });
+    } catch {
+      setFileProblem('That file could not be read. Try choosing it again.');
+    } finally {
+      setReading(false);
+    }
+  }
+
+  /**
+   * A Markdown file, read here and sent as the text it holds: a Hearth export (D52) is text, so
+   * it takes the paste's own procedure and its cap, and a file and a paste are one path.
+   */
+  async function importMarkdown(file: File | undefined) {
+    if (!file) return;
+    forget();
+    setReading(true);
+    try {
+      const contents = await readText(file);
+      if (contents.length > MAX_TEXT_LENGTH) {
+        setFileProblem(MARKDOWN_TOO_LONG);
+        return;
+      }
+      if (contents.trim() === '') {
+        setFileProblem(MARKDOWN_EMPTY);
+        return;
+      }
+      fromText.mutate({ text: contents });
     } catch {
       setFileProblem('That file could not be read. Try choosing it again.');
     } finally {
@@ -368,15 +438,16 @@ export function Import() {
           </li>
           <li>
             <label className={styles.tile}>
-              <span className={styles.tileLabel}>PDF</span>
+              <span className={styles.tileLabel}>PDF or Word</span>
               <span className={styles.tileHint}>A saved recipe</span>
+              {/* `.doc` too, so choosing one gets told what to do rather than greyed out. */}
               <input
                 type="file"
                 className={styles.fileInput}
-                accept="application/pdf,.pdf"
+                accept={`application/pdf,.pdf,.docx,${DOCX_TYPE},.doc,application/msword`}
                 disabled={busy}
                 onChange={(e) => {
-                  void importFile('pdf', e.target.files?.[0]);
+                  void importFile(e.target.files?.[0]);
                   e.target.value = '';
                 }}
               />
@@ -392,6 +463,22 @@ export function Import() {
               <span className={styles.tileLabel}>Text</span>
               <span className={styles.tileHint}>Paste it in</span>
             </button>
+          </li>
+          <li>
+            <label className={styles.tile}>
+              <span className={styles.tileLabel}>Markdown</span>
+              <span className={styles.tileHint}>A recipe exported from Hearth</span>
+              <input
+                type="file"
+                className={styles.fileInput}
+                accept=".md,.markdown,text/markdown,text/plain"
+                disabled={busy}
+                onChange={(e) => {
+                  void importMarkdown(e.target.files?.[0]);
+                  e.target.value = '';
+                }}
+              />
+            </label>
           </li>
           <li>
             <Link to="/recipes/new" className={styles.tile}>

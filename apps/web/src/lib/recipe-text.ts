@@ -1,5 +1,6 @@
 import type { MeasureSystem } from '@hearth/shared';
 import { amountText, type MeasuredIngredient } from './measure-system';
+import { servingsText } from './servings';
 import { sourceSite } from './source-url';
 
 /** A recipe as the recipe screen has it, cut down to what a copy for someone else carries. */
@@ -7,6 +8,8 @@ export interface ShareableRecipe {
   id: string;
   title: string;
   servings: number;
+  /** The high end when the recipe serves a range (D53). */
+  servingsHigh?: number | null;
   prepMinutes: number | null;
   cookMinutes: number | null;
   description: string | null;
@@ -46,10 +49,13 @@ export function ingredientText(
   return [amount, described].filter(Boolean).join(' ');
 }
 
-/** "Serves 4 · Prep 10 min · Cook 30 min", from what the recipe states. */
+/**
+ * "Serves 4 · Prep 10 min · Cook 30 min", from what the recipe states. "Serves 4–6" at the
+ * recipe's own servings when it serves a range.
+ */
 export function recipeMeta(recipe: ShareableRecipe, view: ShareView): string {
   return [
-    `Serves ${view.servings}`,
+    `Serves ${servingsText(view.servings, recipe)}`,
     recipe.prepMinutes != null ? `Prep ${recipe.prepMinutes} min` : null,
     recipe.cookMinutes != null ? `Cook ${recipe.cookMinutes} min` : null,
   ]

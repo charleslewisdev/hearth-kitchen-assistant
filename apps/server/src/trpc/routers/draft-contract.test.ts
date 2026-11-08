@@ -82,6 +82,7 @@ describe('the draft type round-trips through recipe.create', () => {
       .object({
         title: z.string().min(1),
         servings: z.number().int().positive(),
+        servingsHigh: z.number().int().positive().optional(),
         mealTypes: z.array(z.enum(ROUTER_MEAL_TYPES)),
         tags: z.array(z.string()),
         ingredientLines: z.array(z.string()),
@@ -89,6 +90,8 @@ describe('the draft type round-trips through recipe.create', () => {
         // Optional here as it is in the router, and a URL draft does send it: `.strict()` is
         // what makes this line load-bearing rather than decorative.
         sourceUrl: z.string().optional(),
+        sourceName: z.string().max(200).optional(),
+        rating: z.number().int().min(1).max(5).optional(),
         description: z.string().optional(),
         prepMinutes: z.number().int().min(0).optional(),
         cookMinutes: z.number().int().min(0).optional(),
@@ -105,6 +108,34 @@ describe('the draft type round-trips through recipe.create', () => {
     const detailed = emptyDraft({ kind: 'url', url: 'https://example.com/r' });
     detailed.details = { description: 'Headnote.', prepMinutes: 10, cookMinutes: 50 };
     expect(schema.safeParse({ ...draftToCreateInput(detailed), title: 'x' }).success).toBe(true);
+
+    // And with a servings range, which a page saying "Serves 4-6" gives it.
+    const ranged = emptyDraft({ kind: 'url', url: 'https://example.com/r' });
+    ranged.servings = field(4, 'high', 'Serves 4-6');
+    ranged.servingsHigh = 6;
+    expect(draftToCreateInput(ranged)).toMatchObject({ servings: 4, servingsHigh: 6 });
+    expect(schema.safeParse({ ...draftToCreateInput(ranged), title: 'x' }).success).toBe(true);
+  });
+
+  it('saves a servings range and the ingredient ranges a page stated', async () => {
+    const { householdId } = await householdWithOwner();
+    const caller = appRouter.createCaller(
+      testContext({ householdId, session: { userId: 'u' } as never }),
+    );
+    const draft = emptyDraft({ kind: 'url', url: 'https://example.com/stew' });
+    draft.title = field('Stew', 'high', 'Stew');
+    draft.servings = field(4, 'high', '4-6 servings');
+    draft.servingsHigh = 6;
+    draft.ingredientLines = field(['2-3 cloves garlic', '1 cup stock'], 'high', null);
+    draft.steps = field(['Simmer.'], 'high', null);
+
+    const { slug } = await caller.recipe.create(draftToCreateInput(draft));
+    const created = await caller.recipe.get({ idOrSlug: slug });
+    expect(created).toMatchObject({ servings: 4, servingsHigh: 6 });
+    expect(created?.ingredients.map((i) => [i.quantity, i.quantityHigh])).toEqual([
+      [2, 3],
+      [1, null],
+    ]);
   });
 
   it('saves the headnote and times a page stated', async () => {

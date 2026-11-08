@@ -1,5 +1,5 @@
 import { measureIn, slashMeasure, systemOf, type Measure } from './measure-system';
-import { parseQuantity } from './quantity';
+import { parseQuantityRange } from './quantity';
 import { FLUID_WORDS, normalizeUnit, OUNCE_WORDS } from './units';
 import {
   CONTAINER_UNITS,
@@ -12,8 +12,13 @@ import {
 
 /** The structured shape a single typed ingredient line decomposes into. */
 export interface ParsedIngredientLine {
-  /** Numeric amount, or `null` when the line carries no leading quantity. */
+  /** Numeric amount, or `null` when the line carries no leading quantity. The low end of a range. */
   quantity: number | null;
+  /**
+   * The high end when the amount is a range: the 3 of "2-3 cloves garlic" (D53). Absent rather
+   * than null when there is none, like the second measure, and always above `quantity`.
+   */
+  quantityHigh?: number;
   /** Canonical unit token (e.g. `cup`, `tsp`), or `null` when there is none. */
   unit: string | null;
   /** The user's RAW food words, un-normalized (normalization happens later). */
@@ -178,7 +183,7 @@ function isSizePrefix(word: string): boolean {
 
 /**
  * Parse a natural typed ingredient line into structured parts, deterministically
- * (no AI). Reuses {@link parseQuantity} and {@link normalizeUnit} so the amount
+ * (no AI). Reuses {@link parseQuantityRange} and {@link normalizeUnit} so the amount
  * and unit vocabularies stay consistent across the app.
  *
  * The original line (`raw_text`) is preserved by the caller; this function only
@@ -215,13 +220,16 @@ export function parseIngredientLine(line: string): ParsedIngredientLine {
   // 1. Leading quantity: digits, or a size that implies one ("1-pound package"), or words ("one
   // and a half", "a"), or a unit that means one on its own ("Pinch crushed red pepper flakes").
   let quantity: number | null = null;
+  let quantityHigh: number | null = null;
   let quantityText = '';
   const [lead, afterLead] = firstWord(rest);
   const qtyMatch = rest.match(LEADING_QUANTITY);
   if (afterLead !== '' && isSizePrefix(lead)) {
     quantity = 1;
   } else if (qtyMatch) {
-    quantity = parseQuantity(qtyMatch[0]);
+    const range = parseQuantityRange(qtyMatch[0]);
+    quantity = range?.low ?? null;
+    quantityHigh = range?.high ?? null;
     quantityText = qtyMatch[0].trim();
     rest = rest.slice(qtyMatch[0].length).trimStart();
   } else {
@@ -246,6 +254,7 @@ export function parseIngredientLine(line: string): ParsedIngredientLine {
     } else if (after !== '' && quantityText !== '' && LENGTH_WORDS.has(word.toLowerCase())) {
       notes.push(`${quantityText} ${word}`);
       quantity = 1;
+      quantityHigh = null;
       onePiece = true;
       rest = after;
     }
@@ -376,7 +385,12 @@ export function parseIngredientLine(line: string): ParsedIngredientLine {
   }
   const note = notes.length > 0 ? notes.join('; ') : null;
 
-  return alt === null
-    ? { quantity, unit, foodName, note }
-    : { quantity, unit, foodName, note, altQuantity: alt.quantity, altUnit: alt.unit };
+  return {
+    quantity,
+    ...(quantityHigh === null ? {} : { quantityHigh }),
+    unit,
+    foodName,
+    note,
+    ...(alt === null ? {} : { altQuantity: alt.quantity, altUnit: alt.unit }),
+  };
 }

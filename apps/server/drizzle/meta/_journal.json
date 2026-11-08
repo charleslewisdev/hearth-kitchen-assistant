@@ -113,6 +113,13 @@
       "when": 1790636597187,
       "tag": "0015_import_drafts",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1794148942280,
+      "tag": "0016_quantity_ranges",
+      "breakpoints": true
     }
   ]
 }

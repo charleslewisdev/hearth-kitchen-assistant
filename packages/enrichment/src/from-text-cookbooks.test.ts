@@ -122,6 +122,10 @@ describe("Granny's Pecan Bars: a step read in among the ingredient columns", () 
     expect(draft.title.value).toBe("Granny's Pecan Bars");
   });
 
+  it('joins the butter the column cut after "unsalted" (issue #8)', () => {
+    expect(draft.ingredientLines.value).toContain('175g/6oz/½ cup unsalted butter, softened');
+  });
+
   it('does not take the step as an ingredient', () => {
     expect(draft.ingredientLines.value.some((line) => /Preheat/.test(line))).toBe(false);
   });
@@ -205,6 +209,12 @@ describe('Fusilli Picnic Salad', () => {
     expect(draft.details.prepMinutes).toBe(20);
   });
 
+  it('joins the end of the artichokes the column cut off after "thinly" (issue #8)', () => {
+    // "Grect marinated" could be a food as far as shape can tell, so the first break stays.
+    expect(draft.ingredientLines.value).toContain('¼ cup Grect marinated');
+    expect(draft.ingredientLines.value).toContain('artichokes, drained and thinly sliced™® =');
+  });
+
   it('splits the method on "I." as well as "1."', () => {
     expect(draft.steps.value).toHaveLength(7);
     expect(draft.steps.value[0]).toBe('Boil the fusilli in salted water until just tender.');
@@ -272,5 +282,29 @@ describe('the cookbook patterns, on text built to be expensive', () => {
       expect(performance.now() - started).toBeLessThan(500);
       expect(draft).not.toBeNull();
     }
+  });
+});
+
+describe('Smoky Chickpea Stew: ingredients cut off by a narrow column (issue #8)', () => {
+  const draft = page('chickpea-stew');
+
+  it('joins each wrapped ingredient into one line', () => {
+    expect(draft.ingredientLines.value).toEqual([
+      '2 tablespoons olive oil',
+      '1 large yellow onion, peeled and chopped',
+      '3 garlic cloves, finely minced',
+      '1 teaspoon smoked paprika',
+      '1 (28-ounce) can whole tomatoes, drained and thinly sliced',
+      '2 (15-ounce) cans chickpeas, rinsed',
+      '1 cup vegetable stock',
+      '¼ cup finely chopped flat-leaf parsley',
+      '1 bag shredded mozzarella, for the top',
+      'salt and pepper to taste',
+      'pinch of sugar',
+    ]);
+  });
+
+  it('reads the three steps', () => {
+    expect(draft.steps.value).toHaveLength(3);
   });
 });

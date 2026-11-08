@@ -1,13 +1,14 @@
 # Importing recipes
 
-Press **+ Add / Import**. The **Add a recipe** screen has five tiles:
+Press **+ Add / Import**. The **Add a recipe** screen has six tiles:
 
 | Tile           | Use it for                                                      |
 | -------------- | --------------------------------------------------------------- |
 | **Paste link** | A recipe web page                                               |
 | **Photo**      | A photo of a cookbook page or a printout                        |
-| **PDF**        | A PDF, including a scan from a phone scanner app or a scanner   |
+| **PDF or Word** | A PDF, including a scan, or a Word document (.docx)            |
 | **Text**       | Text you copied from anywhere: a web page, an email, a document |
+| **Markdown**   | A recipe file exported from a Hearth                            |
 | **By hand**    | Typing it in ([Adding recipes by hand](adding-recipes.md))      |
 
 Every import ends on the same review screen, **Check this over**. Nothing is saved until you
@@ -114,7 +115,8 @@ guess. It looks for:
   "Directions", "Method" or "Steps". With both headings, it takes everything between them as ingredients, even lines with no
   amounts.
 - **A title:** the first sensible line above the ingredients.
-- **Servings:** a line like "Serves 4", "4 servings", "Makes 12" or "Yield: 6".
+- **Servings:** a line like "Serves 4", "4 servings", "Makes 12" or "Yield: 6", or a range such
+  as "Serves 4 to 6", which fills **Servings** and **Up to**.
 - **Steps:** everything after the ingredients. Numbered steps (`1.`, `2)`, `Step 3`) are split on
   the numbers. Otherwise bulleted lines, otherwise blank lines.
 - **The end:** a line that is only a heading such as "Notes", "Tips", "Nutrition", "Variations",
@@ -140,6 +142,49 @@ Instructions
 
 If Hearth finds no ingredient list, it says: "No recipe was found in that text. An ingredient list
 with amounts on it is what Hearth looks for." Add amounts or the two headings and try again.
+
+## Markdown (a recipe exported from Hearth)
+
+Choose a `.md` file that a Hearth exported, from yours or from another one. You can also paste
+the file's text into **Text**. Hearth reads every field as the file states it, so for an exported
+file nothing on the review screen is marked as a guess: the title, servings, times, recipe types,
+tags, rating, source, notes, ingredients and steps all come back as they were.
+
+- **Linked recipes.** An ingredient made from another recipe is written as `[[Recipe title]]`.
+  Import that recipe first. If it is not in your Hearth, saving says "Ingredient 2 links to a
+  recipe that is not in your library."
+- **One file at a time.** To move a whole library, export it as a zip (see
+  [Keeping a copy of your recipes](cooking.md#keeping-a-copy-of-your-recipes)), unzip it and
+  import the files one by one.
+- **Photos** are not in the file. Add them again on the recipe screen.
+
+A file you write yourself works too, if it starts with front matter between two `---` lines
+that uses the keys shown here. A title or servings the file leaves out is marked on the review
+screen, as for any import:
+
+```
+---
+title: "Grandma's Rolls"
+servings: 12
+tags: ["bread"]
+---
+
+## Ingredients
+
+- 1 cup warm milk
+- 3 cups flour
+
+## Method
+
+1. Mix and knead.
+2. Bake at 375F for 18 minutes.
+
+## Notes
+
+Best warm.
+```
+
+Markdown without front matter goes through the ordinary text import instead.
 
 ## PDF
 
@@ -188,9 +233,27 @@ Messages you may see:
 
 ### Word documents
 
-Word files (.doc, .docx) are not supported. Open the document, select the recipe, copy it and use
-**Text**. Or, in Word, save the document as a PDF and use **PDF**; a PDF saved from Word has real
-text in it.
+Choose a `.docx` file on the **PDF or Word** tile. Hearth reads the document's text and treats it
+like a paste: one line per paragraph, headings on their own lines, a numbered list keeping its
+numbers, and a table one line per row. A table used to lay the recipe out in columns is read one
+column at a time. Pictures, headers, footers, footnotes and comments are not read. The document
+is not kept with the recipe the way a PDF is.
+
+**Older Word files (.doc) are not supported**, and neither are password-protected documents.
+Hearth says: "Hearth could not open that Word document. It may be an older .doc file, or protected
+with a password. Save it as .docx without a password, or copy the recipe and use Text."
+
+**Limits:** 6 MB, and the same 100,000 characters of text as a paste.
+
+Messages you may see:
+
+| Message | What to do |
+| --- | --- |
+| No recipe was found in that document. An ingredient list with amounts on it is what Hearth looks for. | Check the recipe has amounts on its ingredient lines, as for [Text](#text-paste). |
+| Hearth could not read that Word document. It may be damaged, or not a .docx file. Copying the recipe into Text always works. | Open it in Word and save a fresh copy as .docx, or copy the recipe and use **Text**. |
+| That document is too large to import. Copy just the recipe into a new document. | Usually photos make it large. Copy only the recipe's text into a new document, or use **Text**. |
+| There is far more text in that document than a recipe has. Copy just the recipe into a new document. | The document holds more than one recipe. Copy the one you want into a new document. |
+| Reading that document took too long, so Hearth stopped. Copy just the recipe into a new document. | Same as above. If it happens with a short document, tell the owner. |
 
 ## Photo (cookbook pages and printouts)
 
@@ -289,7 +352,8 @@ press **Read**. Hearth starts from the file names, but only you can see which pa
   screen and in its **Filters** panel. Adding tags later means opening every recipe again.
 - **Put the book and page in Source**, for example `Joy of Cooking, p. 212`. It shows on the
   recipe as "From Joy of Cooking, p. 212". Photos are not kept with the recipe.
-- **Set servings every time.** A cookbook's "Serves 4 to 6" reads as 4.
+- **Check servings every time.** A cookbook's "Serves 4 to 6" reads as 4, up to 6; a yield that
+  is not a head count ("Makes 24") needs deciding.
 - **Keep food names consistent** across recipes (see
   [the tips](adding-recipes.md#tips-for-lines-the-parser-gets-wrong)). It pays off on the
   shopping list.

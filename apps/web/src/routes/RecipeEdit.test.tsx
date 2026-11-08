@@ -257,6 +257,46 @@ describe('RecipeEdit', () => {
   });
 });
 
+describe('RecipeEdit ranges (D53)', () => {
+  it('previews both ends of a range as you type', () => {
+    renderCreate();
+    fireEvent.change(screen.getByLabelText('Ingredients, one per line'), {
+      target: { value: '2-3 cloves garlic' },
+    });
+    const preview = screen.getByLabelText('Parsed ingredient preview');
+    expect(within(preview).getByText('2–3 · cloves · garlic')).toBeInTheDocument();
+  });
+
+  it('saves the high end of a servings range, and none for a box that makes no range', () => {
+    renderCreate();
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Chili' } });
+    fireEvent.change(screen.getByLabelText('Servings'), { target: { value: '4' } });
+    const upTo = screen.getByLabelText(/up to/i);
+    fireEvent.change(upTo, { target: { value: '6' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(createMutateAsync).toHaveBeenLastCalledWith(
+      expect.objectContaining({ servings: 4, servingsHigh: 6 }),
+    );
+
+    fireEvent.change(upTo, { target: { value: '3' } });
+    expect(screen.getByText(/up to has to be more than 4/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(createMutateAsync).toHaveBeenLastCalledWith(
+      expect.objectContaining({ servings: 4, servingsHigh: null }),
+    );
+  });
+
+  it('prefills the high end from the loaded recipe', () => {
+    useGetQuery.mockReturnValue({
+      data: { ...EXISTING_RECIPE, servingsHigh: 6 },
+      isLoading: false,
+      isError: false,
+    });
+    renderEdit();
+    expect(screen.getByLabelText(/up to/i)).toHaveValue(6);
+  });
+});
+
 describe('RecipeEdit recipe links', () => {
   it('links the line under the cursor through the picker, and shows it in the preview', () => {
     renderCreate();

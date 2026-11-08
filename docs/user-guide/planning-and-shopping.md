@@ -10,7 +10,8 @@ The household has one shopping list, on the **Shop** tab. Everyone in the househ
 2. Set **Servings** to the number you are cooking for.
 3. Press **Add to list** at the bottom of the recipe. Hearth says "Added to your shopping list."
 
-Hearth adds each ingredient at the scaled amount. Water is never added: it is in the recipe, not
+Hearth adds each ingredient at the scaled amount, and the high end of a range: "2–3 cloves"
+goes on the list as 3. Water is never added: it is in the recipe, not
 in the shop. The list rounds amounts up, so you always buy enough:
 
 - Counted items (cloves, stalks, cans, or a bare "3 eggs") show as whole numbers: 16⅙ cloves of
@@ -40,6 +41,10 @@ Two lines are added together only when **all** of these are true:
 
 Adding the same recipe twice doubles its amounts.
 
+An amount you change by hand (see [At the store](#at-the-store)) becomes the item's amount, and
+recipes added later add to it. If you change an item's unit to one another recipe item of the same
+food already has, the two become one line with the amounts added together.
+
 ### Adding staples by hand
 
 Type into the box at the top, for example `2 dozen eggs` or `paper towels`, and press **Add**.
@@ -67,16 +72,29 @@ yet.
 - **Remove N unused foods:** clears foods no recipe uses any more, such as ones left behind after
   editing recipes.
 
+### Printing the list
+
+**Print**, beside the title on the **Shop** tab, prints what is still to buy: the date, then each
+department in the list's order, with the amount and a box to tick with a pen on every line.
+Checked items are left off, since they are in the basket already. To keep the list as a file,
+choose **Save as PDF** in the print window. Print appears only when something is left to buy.
+
 ### At the store
 
 - **Tick an item** to check it off. It moves to the **Done** section at the bottom. Tick it again
   to put it back.
+- **Tap an amount** to change it, for example from `6` to `1 dozen`, or from `3 cloves` to
+  `1 head`. Type an amount and a unit only, then press **Save** or Enter. Leave the box empty for
+  no amount. An item with no amount shows **Add amount** instead.
 - **×** removes one item from the list.
 - **Clear checked** removes every checked item, for everyone in the household.
 
 Changes are saved on the server straight away, so every device in the household sees the same
 list. A phone with the list open picks up other people's changes within about 5 seconds, so two of
 you can shop from the same list at once.
+
+If someone else changes an amount, or adds a recipe onto it, while you are changing it, Hearth
+keeps their change and tells you yours was not saved, so neither of you loses an edit unseen.
 
 With no signal (a store with patchy reception), ticks, removals and new items still show at once,
 a note says you're offline and when the list on screen is from, and the changes are sent when the

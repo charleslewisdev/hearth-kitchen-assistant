@@ -1,12 +1,26 @@
-import { useState, useSyncExternalStore, type FormEvent } from 'react';
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type FormEvent,
+  type KeyboardEvent,
+} from 'react';
 import { Link } from 'react-router-dom';
-import { formatQuantity, shoppingQuantity, unitLabel } from '@hearth/shared';
+import {
+  listAmountText,
+  MAX_LIST_AMOUNT_LENGTH,
+  parseListAmount,
+  shoppingQuantity,
+} from '@hearth/shared';
 import { trpc } from '../lib/trpc';
 import { departmentStyle } from '../lib/departments';
 import { useOnKeptSession } from '../lib/offline-context';
 import { keptListTime } from '../lib/kept-list-time';
 import styles from './ShoppingList.module.css';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
+import { ShoppingListPrint } from './ShoppingListPrint';
 
 // One shopping-list item as returned by `shoppingList.get`.
 type Item = {
@@ -26,10 +40,30 @@ type Item = {
 // Compose the "2 cups", "1 cup", "3" amount prefix. Empty when no quantity. A counted item
 // reads as whole ones to buy ("17 cloves", not "16.17"); the stored quantity stays exact.
 function amountLabel(stored: number | null, unit: string | null): string {
-  const quantity = shoppingQuantity(stored, unit);
-  if (quantity == null) return '';
-  const amount = formatQuantity(quantity, unit);
-  return unit ? `${amount} ${unitLabel(unit, quantity)}` : amount;
+  return listAmountText(shoppingQuantity(stored, unit), unit);
+}
+
+/** What an amount edit sends: the text typed, and the amount the item had when the edit began. */
+type AmountEdit = {
+  itemId: string;
+  text: string;
+  seen: { quantity: number | null; unit: string | null };
+};
+
+/**
+ * Why an amount edit did not go through, in words for the cook, or null when the list says it
+ * already. NOT_FOUND means the item is gone: removed on another phone, or merged into another line
+ * by this same edit sent twice. Either way the refetch shows the truth, and a "removed" notice
+ * would be wrong for the second.
+ */
+function amountErrorMessage(err: unknown): string | null {
+  const code = (err as { data?: { code?: string } } | null)?.data?.code;
+  if (code === 'CONFLICT') {
+    return 'That amount was changed on another phone, so your change was not saved. Check it and try again.';
+  }
+  if (code === 'NOT_FOUND') return null;
+  // A dropped connection mid-request lands here too, when the change may have been saved.
+  return 'That amount may not have been saved. Check it and try again.';
 }
 
 // Group unchecked items into department sections in the server's stable order,
@@ -150,6 +184,21 @@ export function ShoppingList() {
   const removeItem = trpc.shoppingList.removeItem.useMutation(
     optimistic<{ itemId: string }>((items, { itemId }) => items.filter((i) => i.id !== itemId)),
   );
+  // An amount edit (D54). Queued edits run one after another on reconnect (`scope`): each says
+  // which amount it started from, so a second edit to the same item must land after the first.
+  const [notice, setNotice] = useState<string | null>(null);
+  const amountUpdates = optimistic<AmountEdit>((items, { itemId, text }) => {
+    const amount = parseListAmount(text);
+    return amount ? items.map((i) => (i.id === itemId ? { ...i, ...amount } : i)) : items;
+  });
+  const setAmount = trpc.shoppingList.setAmount.useMutation({
+    ...amountUpdates,
+    scope: { id: 'shopping-list-amount' },
+    onError: (err, input, context) => {
+      amountUpdates.onError(err, input, context);
+      setNotice(amountErrorMessage(err));
+    },
+  });
   const clearChecked = trpc.shoppingList.clearChecked.useMutation(
     optimistic<void>((items) => items.filter((i) => !i.checked)),
   );
@@ -206,7 +255,28 @@ export function ShoppingList() {
 
   return (
     <section className={styles.screen}>
-      <h1 className={styles.title}>Shopping list</h1>
+      <div className={styles.header}>
+        <h1 className={styles.title}>Shopping list</h1>
+        {/* What is left to buy, on paper: checked items are in the basket already. */}
+        {unchecked.length > 0 && (
+          <button type="button" className={styles.printButton} onClick={() => window.print()}>
+            Print
+          </button>
+        )}
+      </div>
+      {unchecked.length > 0 && (
+        <ShoppingListPrint
+          sections={sections.map(({ department, items }) => ({
+            department,
+            items: items.map(({ id, name, note, quantity, unit }) => ({
+              id,
+              name,
+              note,
+              amount: amountLabel(quantity, unit),
+            })),
+          }))}
+        />
+      )}
 
       {items.length > 0 && (
         <div className={styles.progress}>
@@ -241,6 +311,15 @@ export function ShoppingList() {
         <p className={styles.offline} role="status">
           Can’t reach Hearth right now. Showing your list from {keptListTime(query.dataUpdatedAt)}.
         </p>
+      )}
+
+      {notice && (
+        <div className={styles.notice} role="alert">
+          <span>{notice}</span>
+          <button type="button" className={styles.noticeDismiss} onClick={() => setNotice(null)}>
+            Dismiss
+          </button>
+        </div>
       )}
 
       <form className={styles.addBar} onSubmit={handleAdd}>
@@ -301,6 +380,10 @@ export function ShoppingList() {
                 item={item}
                 onToggle={() => toggleChecked.mutate({ itemId: item.id, checked: !item.checked })}
                 onRemove={() => removeItem.mutate({ itemId: item.id })}
+                onSetAmount={(text, seen) => {
+                  setNotice(null);
+                  setAmount.mutate({ itemId: item.id, text, seen });
+                }}
               />
             ))}
           </ul>
@@ -318,6 +401,10 @@ export function ShoppingList() {
                 done
                 onToggle={() => toggleChecked.mutate({ itemId: item.id, checked: !item.checked })}
                 onRemove={() => removeItem.mutate({ itemId: item.id })}
+                onSetAmount={(text, seen) => {
+                  setNotice(null);
+                  setAmount.mutate({ itemId: item.id, text, seen });
+                }}
               />
             ))}
           </ul>
@@ -332,41 +419,162 @@ function ItemRow({
   done = false,
   onToggle,
   onRemove,
+  onSetAmount,
 }: {
   item: Item;
   done?: boolean;
   onToggle: () => void;
   onRemove: () => void;
+  onSetAmount: (text: string, seen: AmountEdit['seen']) => void;
 }) {
   // Added on this phone and not yet confirmed: the server has no id for it to tick or remove.
   const pending = item.id.startsWith(PENDING_PREFIX);
   const amount = amountLabel(item.quantity, item.unit);
+  // The amount the cook was looking at when they opened the box. Kept from that moment, not read
+  // at Save, so a change from another phone that arrives meanwhile is caught as a clash (D54).
+  const [editingFrom, setEditingFrom] = useState<AmountEdit['seen'] | null>(null);
+  const editing = editingFrom !== null;
+  const amountButton = useRef<HTMLButtonElement>(null);
+  const wasEditing = useRef(false);
+
+  // Back to the amount once the box closes, so a keyboard user carries on where they were.
+  useEffect(() => {
+    if (wasEditing.current && !editing) amountButton.current?.focus();
+    wasEditing.current = editing;
+  }, [editing]);
+
   return (
     <li className={done ? `${styles.item} ${styles.itemDone}` : styles.item}>
-      <label className={styles.itemLabel}>
-        <input
-          type="checkbox"
-          className={styles.check}
-          checked={item.checked}
-          onChange={onToggle}
+      <div className={styles.itemRow}>
+        <label className={styles.itemLabel}>
+          <input
+            type="checkbox"
+            className={styles.check}
+            checked={item.checked}
+            onChange={onToggle}
+            disabled={pending}
+            aria-label={item.checked ? `Uncheck ${item.name}` : `Check ${item.name}`}
+          />
+          <span className={styles.itemText}>
+            <span className={styles.name}>{item.name}</span>
+            {item.note && <span className={styles.note}>{item.note}</span>}
+          </span>
+        </label>
+        <button
+          ref={amountButton}
+          type="button"
+          className={amount ? styles.amount : `${styles.amount} ${styles.amountEmpty}`}
+          onClick={() => setEditingFrom({ quantity: item.quantity, unit: item.unit })}
           disabled={pending}
-          aria-label={item.checked ? `Uncheck ${item.name}` : `Check ${item.name}`}
+          aria-expanded={editing}
+          // Starts with the words on the button, so a voice user can say what they see.
+          aria-label={
+            amount ? `${amount}, change amount of ${item.name}` : `Add amount for ${item.name}`
+          }
+        >
+          {amount ? <span>{amount}</span> : 'Add amount'}
+        </button>
+        <button
+          type="button"
+          className={styles.remove}
+          onClick={onRemove}
+          disabled={pending}
+          aria-label={`Remove ${item.name}`}
+        >
+          ×
+        </button>
+      </div>
+      {editingFrom && (
+        <AmountEditor
+          name={item.name}
+          initial={amountLabel(editingFrom.quantity, editingFrom.unit)}
+          onSave={(text) => {
+            setEditingFrom(null);
+            onSetAmount(text, editingFrom);
+          }}
+          onClose={() => setEditingFrom(null)}
         />
-        <span className={styles.itemText}>
-          <span className={styles.name}>{item.name}</span>
-          {item.note && <span className={styles.note}>{item.note}</span>}
-        </span>
-        {amount && <span className={styles.amount}>{amount}</span>}
-      </label>
-      <button
-        type="button"
-        className={styles.remove}
-        onClick={onRemove}
-        disabled={pending}
-        aria-label={`Remove ${item.name}`}
-      >
-        ×
-      </button>
+      )}
     </li>
+  );
+}
+
+/**
+ * The box an item's amount is changed in: "3", "1 ½ lb", "12 oz", or empty for none. Read with
+ * the same parser as the server, so a typo is caught here rather than refused after a round trip.
+ */
+function AmountEditor({
+  name,
+  initial,
+  onSave,
+  onClose,
+}: {
+  name: string;
+  initial: string;
+  onSave: (text: string) => void;
+  onClose: () => void;
+}) {
+  const [text, setText] = useState(initial);
+  const [invalid, setInvalid] = useState(false);
+  const id = useId();
+  const hintId = `${id}-hint`;
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    const value = text.trim();
+    if (value === initial) return onClose();
+    if (parseListAmount(value) === null) return setInvalid(true);
+    onSave(value);
+  }
+
+  function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      onClose();
+    }
+  }
+
+  return (
+    <form className={styles.amountForm} onSubmit={handleSubmit}>
+      <label className={styles.amountFieldLabel} htmlFor={id}>
+        Amount of {name}
+      </label>
+      <div className={styles.amountFieldRow}>
+        <input
+          id={id}
+          className={styles.amountInput}
+          type="text"
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value);
+            setInvalid(false);
+          }}
+          onKeyDown={handleKeyDown}
+          onFocus={(e) => e.currentTarget.select()}
+          maxLength={MAX_LIST_AMOUNT_LENGTH}
+          autoComplete="off"
+          enterKeyHint="done"
+          aria-invalid={invalid}
+          aria-describedby={hintId}
+          // The box opens because the cook asked for it; typing should start at once.
+          autoFocus
+        />
+        <button type="submit" className={styles.amountSave}>
+          Save
+        </button>
+        <button type="button" className={styles.amountCancel} onClick={onClose}>
+          Cancel
+        </button>
+      </div>
+      <p
+        id={hintId}
+        className={invalid ? styles.amountError : styles.amountHint}
+        aria-live="polite"
+      >
+        {invalid
+          ? 'Type an amount and unit only, like 3, 1 ½ lb or 12 oz.'
+          : 'Like 3, 1 ½ lb or 12 oz. Leave it empty for no amount.'}
+      </p>
+    </form>
   );
 }
