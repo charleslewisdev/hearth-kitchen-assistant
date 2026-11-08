@@ -90,7 +90,7 @@ Portion scaling with per-ingredient non-linear rules; assign extra portions to l
 ### P5 — Share & export ⬜
 Magic-link sharing (flat permission), Markdown export/import between instances, PDF export, print.
 **Exit:** a recipe can be shared by link and round-tripped between two Hearth instances.
-**Pulled forward (2026-09-27, owner request):** sending a recipe to someone outside the household (family asking for recipes) is sequenced right after interactive import parsing, ahead of the rest of P5. The first cut is a read-only share link to one recipe, and a printable or PDF copy. **2026-09-28:** the owner chose to ship Share (plain text through the phone's share sheet, or copy) and Print (a print sheet, Save as PDF) first, with no public surface; the read-only link waits until they have used those.
+**Pulled forward (2026-09-27, owner request):** sending a recipe to someone outside the household (family asking for recipes) is sequenced right after interactive import parsing, ahead of the rest of P5. The first cut is a read-only share link to one recipe, and a printable or PDF copy. **2026-09-28:** the owner chose to ship Share (plain text through the phone's share sheet, or copy) and Print (a print sheet, Save as PDF) first, with no public surface; the read-only link waits until they have used those. **2026-11-08:** Markdown export and import shipped ([D52](DECISION_LOG.md)): one recipe as a `.md` download from the recipe screen, the whole library as a zip from More, and the Import screen's Markdown tile (or a paste) reads a file back. Importing a whole zip at once, and carrying photos, are still to do.
 
 ### P6 — Savings: sale ads ⬜
 Tiered: (T1) feed sale ads in supported formats → (T2) align planning to sales → (T3) brand/over-stock nudges → (T4) scraping/native integration (feasibility-gated).
@@ -139,7 +139,7 @@ Surfaced by the 2026-06-18 P0 plan stress test (details + rationale in [DECISION
 - ~~**Audience-vs-delivery tension**~~ **Answered for the near term 2026-09-08 → [D36](DECISION_LOG.md):** the author's own instance will be internet-reachable so family can use it, so public-readiness (verification, rate limiting, TLS, secret hygiene) is being built now as P0.5 rather than deferred. Accounts are invite-only; a hosted multi-tenant offering remains a separate, later question.
 - ~~**Solo-build scope / "dogfood line"**~~ **Resolved 2026-07-04 → [D33](DECISION_LOG.md):** the minimal weekly-use slice is grocery planning (recipes → editable list). Re-scoped into a **Grocery MVP** built before P1's cook/search polish. (Pulling a *differentiator* forward as early proof remains open — MVP prioritizes usable-core over moat.)
 - **Sale-ad T1 input availability** — validate that any real store ships structured sale data before committing the P6 architecture, or it falls through to LLM and breaks deterministic-first.
-- **Data export scheduling** — pull a basic structured export earlier than P5 to honor "no lock-in" before early adopters can churn.
+- ~~**Data export scheduling**~~ **Answered 2026-11-08 → [D52](DECISION_LOG.md):** recipes export as Markdown (one file, or the library as a zip) and import back. Photos, the cook log, plans and the shopping list are not exported yet.
 
 ## Session log
 
