@@ -12,6 +12,7 @@ import fastifyStatic from '@fastify/static';
 import { fastifyTRPCPlugin } from '@trpc/server/adapters/fastify';
 import {
   base64Length,
+  MAX_DOCX_BYTES,
   MAX_IMAGE_IMPORT_BYTES,
   MAX_PDF_BYTES,
   MAX_TRPC_BATCH,
@@ -299,12 +300,12 @@ export type BuildServerOptions = {
  * The largest body the tRPC routes accept.
  *
  * The biggest thing that travels through them is an import upload, base64 encoded, so this is
- * the larger of the two upload caps at its encoded length plus room for the JSON envelope and
+ * the largest of the upload caps at its encoded length plus room for the JSON envelope and
  * the tRPC wrapper around it. It is derived rather than written down, so raising an upload cap
  * cannot leave a body limit that silently refuses the uploads it now allows.
  */
 export const MAX_IMPORT_BODY_BYTES =
-  base64Length(Math.max(MAX_PDF_BYTES, MAX_IMAGE_IMPORT_BYTES)) + 64 * 1024;
+  base64Length(Math.max(MAX_PDF_BYTES, MAX_DOCX_BYTES, MAX_IMAGE_IMPORT_BYTES)) + 64 * 1024;
 
 export async function buildServer(opts: BuildServerOptions = {}): Promise<FastifyInstance> {
   // Widened deliberately: a pino `Logger` here would specialize Fastify's logger generic, and

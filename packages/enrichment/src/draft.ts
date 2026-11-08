@@ -47,12 +47,13 @@ export interface DraftField<T> {
  *
  * Only the URL kind carries anything, and what it carries is provenance the recipe keeps: it
  * becomes `recipe.source_url` on save, which is how a cook gets back to the headnote, the
- * comments or the photo. The other three have nothing of that sort to keep - a file name is not
+ * comments or the photo. The others have nothing of that sort to keep - a file name is not
  * somewhere anybody can return to - so they name the kind and stop there.
  */
 export type DraftSource =
   | { kind: 'url'; url: string }
   | { kind: 'text' }
+  | { kind: 'docx' }
   | { kind: 'pdf' }
   | { kind: 'image' }
   /**

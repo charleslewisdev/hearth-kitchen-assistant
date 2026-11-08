@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { MAX_IMAGE_BYTES } from '@hearth/shared';
+import { MAX_DOCX_BYTES, MAX_IMAGE_BYTES } from '@hearth/shared';
 import { Import, defaultPageOrder } from './Import';
 import { trpc } from '../lib/trpc';
 
@@ -18,6 +18,7 @@ vi.mock('../lib/trpc', () => ({
       fromUrl: { useMutation: vi.fn() },
       fromText: { useMutation: vi.fn() },
       fromPdf: { useMutation: vi.fn() },
+      fromDocx: { useMutation: vi.fn() },
       fromImage: { useMutation: vi.fn() },
     },
     recipe: {
@@ -39,8 +40,8 @@ vi.mock('react-router-dom', async () => {
 const useCreate = trpc.recipe.create.useMutation as unknown as Mock;
 
 /** Every import procedure's mocked mutation, so a test can watch or steer any of them. */
-type Source = 'fromUrl' | 'fromText' | 'fromPdf' | 'fromImage';
-const SOURCES: Source[] = ['fromUrl', 'fromText', 'fromPdf', 'fromImage'];
+type Source = 'fromUrl' | 'fromText' | 'fromPdf' | 'fromDocx' | 'fromImage';
+const SOURCES: Source[] = ['fromUrl', 'fromText', 'fromPdf', 'fromDocx', 'fromImage'];
 
 const mutate: Record<Source, Mock> = {} as Record<Source, Mock>;
 const reset: Record<Source, Mock> = {} as Record<Source, Mock>;
@@ -109,7 +110,10 @@ describe('the source tiles', () => {
     renderImport();
     for (const [label, accept] of [
       [/photo/i, 'image/*'],
-      [/pdf/i, 'application/pdf,.pdf'],
+      [
+        /pdf/i,
+        'application/pdf,.pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.doc,application/msword',
+      ],
     ] as const) {
       const input = screen.getByLabelText(label);
       expect(input).toHaveAttribute('type', 'file');
@@ -291,6 +295,59 @@ describe('importing a file', () => {
     renderImport();
     expect(screen.getByLabelText(/photo/i)).toBeDisabled();
     expect(screen.getByLabelText(/pdf/i)).toBeDisabled();
+  });
+
+  it('offers Word documents on the PDF tile, and sends a .docx to its own procedure', async () => {
+    renderImport();
+    const input = screen.getByLabelText(/pdf or word/i);
+    expect(input.getAttribute('accept')).toContain('.docx');
+    fireEvent.change(input, {
+      target: { files: [new File([new Uint8Array([80, 75, 3, 4])], 'Oat Bars.DOCX')] },
+    });
+    // "PK\x03\x04", a zip's first bytes, as base64.
+    await waitFor(() => expect(mutate.fromDocx).toHaveBeenCalledWith({ fileBase64: 'UEsDBA==' }));
+    expect(mutate.fromPdf).not.toHaveBeenCalled();
+  });
+
+  it('knows a Word document by its media type when its name has no extension', async () => {
+    renderImport();
+    fireEvent.change(screen.getByLabelText(/pdf or word/i), {
+      target: {
+        files: [
+          new File([new Uint8Array([80, 75, 3, 4])], 'recipe', {
+            type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          }),
+        ],
+      },
+    });
+    await waitFor(() => expect(mutate.fromDocx).toHaveBeenCalledTimes(1));
+    expect(mutate.fromPdf).not.toHaveBeenCalled();
+  });
+
+  it('shows the server sentence when a Word document could not be read', () => {
+    const message = 'Hearth could not read that Word document.';
+    mockSource('fromDocx', { isError: true, error: { message } });
+    renderImport();
+    expect(screen.getByRole('alert')).toHaveTextContent(message);
+  });
+
+  it('tells a cook with an old .doc what to do, without uploading it', async () => {
+    renderImport();
+    fireEvent.change(screen.getByLabelText(/pdf or word/i), {
+      target: { files: [new File([new Uint8Array([0xd0, 0xcf])], 'recipe.doc')] },
+    });
+    expect(await screen.findByRole('alert')).toHaveTextContent(/save it as \.docx/i);
+    expect(mutate.fromDocx).not.toHaveBeenCalled();
+    expect(mutate.fromPdf).not.toHaveBeenCalled();
+  });
+
+  it('refuses an oversized Word document itself', async () => {
+    renderImport();
+    fireEvent.change(screen.getByLabelText(/pdf or word/i), {
+      target: { files: [fileOf('huge.docx', '', MAX_DOCX_BYTES + 1)] },
+    });
+    expect(await screen.findByRole('alert')).toHaveTextContent(/document is too large/i);
+    expect(mutate.fromDocx).not.toHaveBeenCalled();
   });
 });
 
@@ -491,6 +548,13 @@ describe('once a draft comes back', () => {
     expect(await screen.findByRole('heading', { name: /check this over/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /what the photo said/i })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /food\.com/i })).not.toBeInTheDocument();
+  });
+
+  it('reviews a Word document’s draft on the same screen, naming the document', async () => {
+    mockSource('fromDocx', { data: { ...draft, source: { kind: 'docx' } } });
+    renderImport();
+    expect(await screen.findByRole('heading', { name: /check this over/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /what the document said/i })).toBeInTheDocument();
   });
 
   it('clears every source when the cook starts over', async () => {

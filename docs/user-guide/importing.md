@@ -6,7 +6,7 @@ Press **+ Add / Import**. The **Add a recipe** screen has six tiles:
 | -------------- | --------------------------------------------------------------- |
 | **Paste link** | A recipe web page                                               |
 | **Photo**      | A photo of a cookbook page or a printout                        |
-| **PDF**        | A PDF, including a scan from a phone scanner app or a scanner   |
+| **PDF or Word** | A PDF, including a scan, or a Word document (.docx)            |
 | **Text**       | Text you copied from anywhere: a web page, an email, a document |
 | **Markdown**   | A recipe file exported from a Hearth                            |
 | **By hand**    | Typing it in ([Adding recipes by hand](adding-recipes.md))      |
@@ -233,9 +233,27 @@ Messages you may see:
 
 ### Word documents
 
-Word files (.doc, .docx) are not supported. Open the document, select the recipe, copy it and use
-**Text**. Or, in Word, save the document as a PDF and use **PDF**; a PDF saved from Word has real
-text in it.
+Choose a `.docx` file on the **PDF or Word** tile. Hearth reads the document's text and treats it
+like a paste: one line per paragraph, headings on their own lines, a numbered list keeping its
+numbers, and a table one line per row. A table used to lay the recipe out in columns is read one
+column at a time. Pictures, headers, footers, footnotes and comments are not read. The document
+is not kept with the recipe the way a PDF is.
+
+**Older Word files (.doc) are not supported**, and neither are password-protected documents.
+Hearth says: "Hearth could not open that Word document. It may be an older .doc file, or protected
+with a password. Save it as .docx without a password, or copy the recipe and use Text."
+
+**Limits:** 6 MB, and the same 100,000 characters of text as a paste.
+
+Messages you may see:
+
+| Message | What to do |
+| --- | --- |
+| No recipe was found in that document. An ingredient list with amounts on it is what Hearth looks for. | Check the recipe has amounts on its ingredient lines, as for [Text](#text-paste). |
+| Hearth could not read that Word document. It may be damaged, or not a .docx file. Copying the recipe into Text always works. | Open it in Word and save a fresh copy as .docx, or copy the recipe and use **Text**. |
+| That document is too large to import. Copy just the recipe into a new document. | Usually photos make it large. Copy only the recipe's text into a new document, or use **Text**. |
+| There is far more text in that document than a recipe has. Copy just the recipe into a new document. | The document holds more than one recipe. Copy the one you want into a new document. |
+| Reading that document took too long, so Hearth stopped. Copy just the recipe into a new document. | Same as above. If it happens with a short document, tell the owner. |
 
 ## Photo (cookbook pages and printouts)
 

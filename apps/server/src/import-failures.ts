@@ -6,7 +6,7 @@ import { env } from './env';
 /**
  * Keep what an import could not read, so it can be studied later.
  *
- * A photo or PDF that produced no recipe is exactly the material the parser needs improving
+ * A photo, PDF or Word document that produced no recipe is exactly the material the parser needs improving
  * against, and until now it was gone the moment the request ended. Each failure becomes a
  * folder under `DATA_DIR/import-failures/<household>/`, named by time and a fresh id, holding
  * the uploaded bytes as they arrived and a `meta.json` saying which procedure failed and why
@@ -22,7 +22,7 @@ export const MAX_KEPT = 200;
 const HOUSEHOLD_ID = /^[A-Za-z0-9_-]{1,64}$/;
 
 export interface FailedImport {
-  kind: 'image' | 'pdf';
+  kind: 'image' | 'pdf' | 'docx';
   reason: string;
   files: Uint8Array[];
   /** What was read off the page, when it was read and held no recipe. */
@@ -45,7 +45,7 @@ export async function keepFailedImport(
   const id = `${now.toISOString().replace(/[:.]/g, '-')}-${randomUUID().slice(0, 8)}`;
   const dir = join(base, id);
   await mkdir(dir, { recursive: true });
-  const ext = failure.kind === 'pdf' ? 'pdf' : 'jpg';
+  const ext = failure.kind === 'image' ? 'jpg' : failure.kind;
   // The text only when some was read: no text.txt means OCR found nothing on the page.
   const text = failure.text?.trim() ? failure.text : undefined;
   await Promise.all([

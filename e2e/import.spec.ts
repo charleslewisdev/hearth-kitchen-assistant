@@ -26,6 +26,11 @@ const COOKBOOK_PDF = fileURLToPath(
   new URL('../packages/enrichment/test/fixtures/cookbook-page.pdf', import.meta.url),
 );
 
+/** An invented recipe saved by python-docx from Word's default template (see its generator). */
+const WORD_RECIPE = fileURLToPath(
+  new URL('../packages/enrichment/test/fixtures/word-recipe.docx', import.meta.url),
+);
+
 test.beforeAll(async () => {
   await seedOwnerAndHousehold();
 });
@@ -48,7 +53,7 @@ test('import a PDF, correct what was guessed, and save it', async ({ page }) => 
 
   // 2. Hand over the file. `setInputFiles` puts the real bytes through the real input, so what
   //    crosses the wire is the base64 body the browser builds, not a fixture the server read.
-  await page.getByLabel('PDF').setInputFiles(COOKBOOK_PDF);
+  await page.getByLabel('PDF or Word').setInputFiles(COOKBOOK_PDF);
 
   // 3. The review screen. Nothing has been written yet: this is a draft.
   await expect(page.getByRole('heading', { name: 'Check this over' })).toBeVisible({
@@ -132,4 +137,30 @@ Add the lentils and the stock, bring it to a boil, then simmer for half an hour.
 
   await page.goto('/recipes');
   await expect(page.getByRole('link', { name: /Weeknight Lentil Soup/ })).toBeVisible();
+});
+
+test('import a Word document through the PDF tile, and save it', async ({ page }) => {
+  await signIn(page);
+  await page.goto('/import');
+
+  await page.getByLabel('PDF or Word').setInputFiles(WORD_RECIPE);
+
+  await expect(page.getByRole('heading', { name: 'Check this over' })).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(page.getByRole('heading', { name: 'What the document said' })).toBeVisible();
+  await expect(page.getByLabel('Title')).toHaveValue('Brown Butter Oat Bars');
+  await expect(page.getByText('Taken from the first line of the document.')).toBeVisible();
+  // The list's bullets are gone, and the table's rows are lines like any other.
+  await expect(page.getByLabel('Ingredients, one per line')).toHaveValue(
+    /^1 cup unsalted butter\n2 cups rolled oats[\s\S]*1\/2 cup chocolate chips/,
+  );
+  await expect(page.getByText('2 · cups · rolled oats')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Save recipe' }).click();
+  await expect(page.getByRole('heading', { name: 'Brown Butter Oat Bars' })).toBeVisible();
+  await page.getByRole('tab', { name: 'Steps' }).click();
+  await expect(
+    page.locator('#root').getByText(/Melt the butter until it smells nutty/),
+  ).toBeVisible();
 });
