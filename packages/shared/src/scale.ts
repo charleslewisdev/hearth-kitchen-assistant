@@ -43,3 +43,18 @@ export function scale(
   // Round to 3 decimal places.
   return Math.round(scaled * 1000) / 1000;
 }
+
+/**
+ * Scale both ends of an amount that may be a range ("2-3 cloves" for 4, cooked for 8, is "4-6
+ * cloves"), by the same rule as {@link scale}. D53.
+ */
+export function scaleRange(
+  ingredient: { quantity: number | null; quantityHigh: number | null; mode: ScalingMode },
+  servings: { from: number; to: number },
+): { quantity: number | null; quantityHigh: number | null } {
+  const { quantity, quantityHigh, mode } = ingredient;
+  return {
+    quantity: scale({ quantity, mode }, servings),
+    quantityHigh: quantity === null ? null : scale({ quantity: quantityHigh, mode }, servings),
+  };
+}
