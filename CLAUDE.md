@@ -15,10 +15,10 @@ A self-hosted, invite-only household app for recipes, shopping lists and meal pl
 ## Conventions that differ from defaults
 
 - Every domain table carries `household_id` and is reached only through `withHousehold()` in `apps/server/src/repo/tenant.ts`, with RLS behind it. Details load from `.claude/rules/` when you open server files.
-- Zod schemas live in the server (routers and `env.ts`). `packages/shared` has no zod; it is pure logic consumed from source (`main: ./src/index.ts`). `docs/ARCHITECTURE.md` and D23 say otherwise and are stale.
+- Zod schemas live in the server (routers and `env.ts`). `packages/shared` has no zod; it is pure logic consumed from source (`main: ./src/index.ts`). D57 records this; it corrects D23.
 - Keep every regex over untrusted text linear: bound repetitions (`{0,200}`) or put a lookbehind such as `(?<!\d)` before a leading `\d+` or `\s+`, and add a timed hostile-input test. Unbounded patterns have frozen the server twice and cook mode once.
 - Nothing AI-backed exists, and core flows must work without it. Import is deterministic; OCR runs in the box.
-- Design specs are in `docs/specs/`. Implementation plans in `docs/plans/` are local and git-ignored. Open work is in `docs/ROADMAP.md` and `docs/DECISION_LOG.md`.
+- Design specs are in `docs/specs/`. Implementation plans in `docs/plans/` are local and git-ignored. Open work is in GitHub issues (`gh issue list`); `docs/ROADMAP.md` keeps the phases and exit criteria, and `docs/DECISION_LOG.md` the decisions.
 
 ## Pitfalls
 
