@@ -1,0 +1,244 @@
+import { describe, it, expect } from 'vitest';
+import {
+  hasFrontMatter,
+  parseRecipeMarkdown,
+  recipeMarkdownFileName,
+  recipeToMarkdown,
+  type MarkdownRecipe,
+} from './recipe-markdown';
+
+/** An invented recipe that uses every field the format carries. */
+const rich: MarkdownRecipe = {
+  title: 'Charred Fennel & "Smoky" Toast: Take 2',
+  servings: 6,
+  prepMinutes: 15,
+  cookMinutes: 40,
+  types: ['dinner', 'side'],
+  tags: ['make ahead', 'weeknight'],
+  rating: 4,
+  sourceName: 'Aunt Wren’s card box, card 7',
+  sourceUrl: 'https://example.com/recipes/fennel-toast?x=1&y=2',
+  description:
+    'Line one of the notes.\n\n## Not a heading of ours\n- not an ingredient\n1. not a step',
+  ingredientLines: [
+    '3 cups (360g) flour',
+    '1 Pizza Dough [[Pizza Dough]]',
+    '- a line that starts with a dash',
+    '2 tbsp olive oil, plus more',
+  ],
+  steps: [
+    'Heat the oven to 220°C.',
+    'Toast the bread.\nThen rub it with garlic.\n  Indented on purpose.',
+    '10. Starts with a number of its own.',
+  ],
+};
+
+describe('recipeToMarkdown', () => {
+  it('writes front matter, a title heading and the three sections in a fixed order', () => {
+    const md = recipeToMarkdown(rich);
+    expect(md).toBe(
+      [
+        '---',
+        'hearth_format: 1',
+        'title: "Charred Fennel & \\"Smoky\\" Toast: Take 2"',
+        'servings: 6',
+        'prep_minutes: 15',
+        'cook_minutes: 40',
+        'types: ["dinner", "side"]',
+        'tags: ["make ahead", "weeknight"]',
+        'rating: 4',
+        'source_name: "Aunt Wren’s card box, card 7"',
+        'source_url: "https://example.com/recipes/fennel-toast?x=1&y=2"',
+        '---',
+        '',
+        '# Charred Fennel & "Smoky" Toast: Take 2',
+        '',
+        '## Ingredients',
+        '',
+        '- 3 cups (360g) flour',
+        '- 1 Pizza Dough [[Pizza Dough]]',
+        '- - a line that starts with a dash',
+        '- 2 tbsp olive oil, plus more',
+        '',
+        '## Method',
+        '',
+        '1. Heat the oven to 220°C.',
+        '2. Toast the bread.',
+        '   Then rub it with garlic.',
+        '     Indented on purpose.',
+        '3. 10. Starts with a number of its own.',
+        '',
+        '## Notes',
+        '',
+        'Line one of the notes.',
+        '',
+        '## Not a heading of ours',
+        '- not an ingredient',
+        '1. not a step',
+        '',
+      ].join('\n'),
+    );
+  });
+
+  it('leaves out what a recipe does not have, but keeps both list sections', () => {
+    const md = recipeToMarkdown({
+      title: 'Toast',
+      servings: 1,
+      prepMinutes: null,
+      cookMinutes: null,
+      types: [],
+      tags: [],
+      rating: null,
+      sourceName: null,
+      sourceUrl: null,
+      description: null,
+      ingredientLines: [],
+      steps: [],
+    });
+    expect(md).toBe(
+      '---\nhearth_format: 1\ntitle: "Toast"\nservings: 1\n---\n\n# Toast\n\n## Ingredients\n\n## Method\n',
+    );
+  });
+
+  it('is the same text every time for the same recipe', () => {
+    expect(recipeToMarkdown(rich)).toBe(recipeToMarkdown({ ...rich }));
+  });
+});
+
+describe('parseRecipeMarkdown', () => {
+  it('reads back exactly what recipeToMarkdown wrote', () => {
+    expect(parseRecipeMarkdown(recipeToMarkdown(rich))).toEqual(rich);
+  });
+
+  it('round-trips a recipe with nothing optional in it', () => {
+    const bare: MarkdownRecipe = {
+      title: 'Toast',
+      servings: 1,
+      prepMinutes: null,
+      cookMinutes: null,
+      types: [],
+      tags: [],
+      rating: null,
+      sourceName: null,
+      sourceUrl: null,
+      description: null,
+      ingredientLines: [],
+      steps: [],
+    };
+    expect(parseRecipeMarkdown(recipeToMarkdown(bare))).toEqual(bare);
+  });
+
+  it('round-trips more than nine steps, whose markers grow a digit', () => {
+    const many = { ...rich, steps: Array.from({ length: 12 }, (_, i) => `Step ${i}\nmore ${i}`) };
+    expect(parseRecipeMarkdown(recipeToMarkdown(many))?.steps).toEqual(many.steps);
+  });
+
+  it('is null for text without front matter, so the text heuristics take it', () => {
+    expect(parseRecipeMarkdown('# Toast\n\n## Ingredients\n- 1 slice bread\n')).toBeNull();
+    expect(parseRecipeMarkdown('---\nnot closed\n')).toBeNull();
+    expect(hasFrontMatter('Toast\n---\n')).toBe(false);
+  });
+
+  it('survives Windows line ends and a byte-order mark', () => {
+    const md = '﻿' + recipeToMarkdown(rich).replace(/\n/g, '\r\n');
+    expect(parseRecipeMarkdown(md)).toEqual(rich);
+  });
+
+  it('reads front matter a person wrote by hand in ordinary YAML', () => {
+    const md = [
+      '---',
+      'title: Weeknight Beans',
+      "source_name: 'Grandpa''s notebook'",
+      'servings: 3',
+      'types: [dinner, Lunch, pudding]',
+      'tags:',
+      '  - quick',
+      '  - "one pot"',
+      '# a comment',
+      'unknown_key: ignored',
+      '---',
+      '## Ingredients',
+      '* 1 can beans',
+      '',
+      'a line with no marker',
+      '## Steps',
+      '1) Warm the beans.',
+      '- Season them.',
+      '## Notes',
+      'Good with rice.',
+    ].join('\n');
+    expect(parseRecipeMarkdown(md)).toEqual({
+      title: 'Weeknight Beans',
+      servings: 3,
+      prepMinutes: null,
+      cookMinutes: null,
+      types: ['dinner', 'lunch'],
+      tags: ['quick', 'one pot'],
+      rating: null,
+      sourceName: "Grandpa's notebook",
+      sourceUrl: null,
+      description: 'Good with rice.',
+      ingredientLines: ['1 can beans', 'a line with no marker'],
+      steps: ['Warm the beans.', 'Season them.'],
+    });
+  });
+
+  it('takes the title from the first heading when the front matter has none', () => {
+    const md = '---\nservings: 2\n---\n# Pan Sauce\n## Ingredients\n- 1 shallot\n';
+    expect(parseRecipeMarkdown(md)?.title).toBe('Pan Sauce');
+  });
+
+  it('drops values Hearth would refuse rather than guessing at them', () => {
+    const md = [
+      '---',
+      'title: "Toast"',
+      'servings: 0',
+      'prep_minutes: -5',
+      'cook_minutes: 99999',
+      'rating: 9',
+      'source_url: "javascript:alert(1)"',
+      'types: "dinner"',
+      '---',
+    ].join('\n');
+    expect(parseRecipeMarkdown(md)).toMatchObject({
+      servings: 1,
+      prepMinutes: null,
+      cookMinutes: null,
+      rating: null,
+      sourceUrl: null,
+      types: [],
+    });
+  });
+
+  it('stays linear on hostile input', () => {
+    const started = Date.now();
+    const runs = [
+      '---\n' + 'a'.repeat(200_000),
+      '---\n' + 'title: ' + '"'.repeat(100_000) + '\n---\n',
+      '---\ntitle: x\n---\n## Method\n' + '1'.repeat(100_000) + '. x\n',
+      '---\ntitle: x\n---\n## Method\n' + ' '.repeat(100_000) + 'x\n',
+      '---\ntitle: x\n---\n' + '#'.repeat(100_000) + '\n',
+      '---\ntitle: x\n---\n## Ingredients\n' + '- '.repeat(100_000) + '\n',
+      '---\n' + 'tags: [' + 'a,'.repeat(50_000) + '\n---\n',
+      '---\n' + ':'.repeat(100_000) + '\n---\n',
+      '---\ntitle: x\n---\n' + '\n'.repeat(100_000),
+    ];
+    for (const run of runs) parseRecipeMarkdown(run);
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
+});
+
+describe('recipeMarkdownFileName', () => {
+  it('names a file after the recipe, and never twice in one export', () => {
+    const used = new Set<string>();
+    expect(recipeMarkdownFileName('Lemon Rice', used)).toBe('lemon-rice.md');
+    expect(recipeMarkdownFileName('Lemon rice!', used)).toBe('lemon-rice-2.md');
+    expect(recipeMarkdownFileName('Lemon Rice', used)).toBe('lemon-rice-3.md');
+    expect(recipeMarkdownFileName('Сырники', used)).toBe('recipe.md');
+    expect(recipeMarkdownFileName('', used)).toBe('recipe-2.md');
+  });
+
+  it('keeps a long title to a name every file system takes', () => {
+    expect(recipeMarkdownFileName('x'.repeat(500), new Set()).length).toBeLessThanOrEqual(83);
+  });
+});
