@@ -509,7 +509,7 @@ describe('a Markdown file exported from Hearth', () => {
         raw: null,
       },
       steps: {
-        value: ['Toast the barley.\nKeep it moving.', 'Simmer.'],
+        value: ['Toast the barley.\n\nKeep it moving.', 'Simmer.'],
         confidence: 'high',
         raw: null,
       },
@@ -536,7 +536,7 @@ describe('a Markdown file exported from Hearth', () => {
       mealTypes: ['side'],
       tags: ['grains', 'make ahead'],
       ingredientLines: ['1 cup pearl barley', '2 cups stock [[House Stock]]'],
-      steps: ['Toast the barley.\nKeep it moving.', 'Simmer.'],
+      steps: ['Toast the barley.\n\nKeep it moving.', 'Simmer.'],
       sourceName: 'Aunt Wren’s card box',
       description: 'Nutty.\n\nGood cold.',
       prepMinutes: 5,
@@ -546,6 +546,18 @@ describe('a Markdown file exported from Hearth', () => {
     });
     // The file's source is the recipe's, not one the cook typed: it is not remembered.
     expect(localStorage.getItem('hearth.import.lastSource')).toBe('Some other book, p. 3');
+  });
+
+  it('splits the steps again only once the cook has edited them', async () => {
+    renderReview(markdownDraft());
+    const note = screen.getByText(/a step in the file has a blank line inside it/i);
+    fireEvent.change(screen.getByLabelText(/steps, one per blank line/i), {
+      target: { value: 'Toast it.\n\nSimmer it.' },
+    });
+    expect(note).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /save recipe/i }));
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalled());
+    expect(mutateAsync.mock.calls[0]![0].steps).toEqual(['Toast it.', 'Simmer it.']);
   });
 
   it('shows the rating the file carries', () => {

@@ -52,11 +52,22 @@ const MAX_MINUTES = 10_000;
 const quote = (value: string) => JSON.stringify(value);
 const list = (values: readonly string[]) => `[${values.map(quote).join(', ')}]`;
 
-/** Lines of a step after its first, indented under the marker so Markdown keeps them in it. */
+/**
+ * A numbered step. Lines after its first are indented under the marker, so Markdown keeps them
+ * in the step; a blank line inside it stays empty, with no trailing spaces for an editor to strip.
+ */
 function stepLines(text: string, number: number): string[] {
   const marker = `${number}. `;
   const [first = '', ...rest] = text.split('\n');
-  return [marker + first, ...rest.map((line) => ' '.repeat(marker.length) + line)];
+  const indent = ' '.repeat(marker.length);
+  return [marker + first, ...rest.map((line) => (line.trim() === '' ? '' : indent + line))];
+}
+
+/** The text with any run of newlines at its end made one. A loop: `/\n+$/` is quadratic. */
+function endWithOneNewline(text: string): string {
+  let end = text.length;
+  while (end > 0 && text.charCodeAt(end - 1) === 10) end--;
+  return text.slice(0, end) + '\n';
 }
 
 /** The recipe as a Markdown file, ending in a newline. */
@@ -91,7 +102,7 @@ export function recipeToMarkdown(recipe: MarkdownRecipe): string {
   ];
   // Notes last, so whatever they hold (a `##` line, a list) can only ever be read as notes.
   if (recipe.description !== null) body.push('## Notes', '', recipe.description, '');
-  return [...front, ...body].join('\n').replace(/\n+$/, '\n');
+  return endWithOneNewline([...front, ...body].join('\n'));
 }
 
 /** Text with Windows line ends and a byte-order mark taken out. */
@@ -101,7 +112,9 @@ function normalize(text: string): string {
 
 /**
  * Where the front matter ends, or null when the text has none: the text must open with a `---`
- * line and close it with another within `MAX_FRONT_MATTER` characters.
+ * line and close it with another within `MAX_FRONT_MATTER` characters. Whether what sits between
+ * them is a recipe's front matter, rather than a paste that opens with a horizontal rule, is
+ * decided in `readRecipeMarkdown` by its keys.
  */
 function frontMatterEnd(text: string): number | null {
   if (!text.startsWith('---\n')) return null;
@@ -109,11 +122,6 @@ function frontMatterEnd(text: string): number | null {
   if (close === -1 || close > MAX_FRONT_MATTER) return null;
   const after = text.charAt(close + 4);
   return after === '\n' || after === '' ? close : null;
-}
-
-/** Whether the text opens with front matter, which is what routes a paste to this parser. */
-export function hasFrontMatter(text: string): boolean {
-  return frontMatterEnd(normalize(text)) !== null;
 }
 
 /** One YAML scalar as a string: JSON double quotes, single quotes, or bare. */
@@ -156,9 +164,10 @@ function readFrontMatter(block: string): Map<string, string | string[]> {
     const trimmed = line.trim();
     if (trimmed === '' || trimmed.startsWith('#')) continue;
     // "  - item" under a key with no value of its own.
-    if (listKey !== null && line !== line.trimStart() && trimmed.startsWith('- ')) {
+    // "  - item" or "- item" under a key with no value of its own (YAML allows both).
+    if (listKey !== null && (trimmed.startsWith('- ') || trimmed === '-')) {
       const items = fields.get(listKey);
-      if (Array.isArray(items)) items.push(scalar(trimmed.slice(2)));
+      if (Array.isArray(items)) items.push(scalar(trimmed.slice(1)));
       continue;
     }
     listKey = null;
@@ -198,6 +207,20 @@ function integerField(
   const n = Number(text);
   return n >= min && n <= max ? n : null;
 }
+
+/** The keys this format writes; front matter needs one of them to be read as a recipe's. */
+const FRONT_MATTER_KEYS = [
+  'hearth_format',
+  'title',
+  'servings',
+  'prep_minutes',
+  'cook_minutes',
+  'types',
+  'tags',
+  'rating',
+  'source_name',
+  'source_url',
+];
 
 const RECIPE_TYPE_SET: ReadonlySet<string> = new Set(RECIPE_TYPES);
 
@@ -245,6 +268,9 @@ export function readRecipeMarkdown(input: string): ReadMarkdownRecipe | null {
   const end = frontMatterEnd(text);
   if (end === null) return null;
   const fields = readFrontMatter(text.slice(4, end));
+  // Two `---` lines with none of this format's keys between them are horizontal rules in a
+  // paste, not front matter: that text belongs to the text importer.
+  if (!FRONT_MATTER_KEYS.some((key) => fields.has(key))) return null;
   const bodyLines = text.slice(end + 4).split('\n');
 
   const ingredientLines: string[] = [];
@@ -254,8 +280,9 @@ export function readRecipeMarkdown(input: string): ReadMarkdownRecipe | null {
   let heading: string | null = null;
   let section: Section | 'intro' = 'intro';
   const seen = new Set<Section>();
-  // The step being read, and how far its continuation lines are indented.
-  let step: { lines: string[]; indent: number } | null = null;
+  // The step being read, how far its continuation lines are indented, and how many blank lines
+  // have gone by since its last line: they are the step's only if an indented line follows.
+  let step: { lines: string[]; indent: number; blanks: number } | null = null;
   const closeStep = () => {
     if (step) steps.push(step.lines.join('\n'));
     step = null;
@@ -284,19 +311,26 @@ export function readRecipeMarkdown(input: string): ReadMarkdownRecipe | null {
       if (item !== '') ingredientLines.push(item);
     } else if (section === 'method') {
       const marker = STEP_MARKER.exec(line) ?? BULLET_MARKER.exec(line);
-      const current = step as { lines: string[]; indent: number } | null;
+      const current = step as { lines: string[]; indent: number; blanks: number } | null;
+      const spaces = leadingSpaces(line);
       if (marker) {
         closeStep();
-        step = { lines: [line.slice(marker[0].length)], indent: marker[0].length };
-      } else if (current && line.trim() === '' && current.indent === 0) {
-        // A blank line after an unnumbered paragraph ends that step.
+        step = { lines: [line.slice(marker[0].length)], indent: marker[0].length, blanks: 0 };
+      } else if (line.trim() === '') {
+        // A blank line ends an unnumbered paragraph; inside a numbered step it waits to see.
+        if (current && current.indent === 0) closeStep();
+        else if (current) current.blanks++;
+      } else if (
+        current &&
+        (current.blanks === 0 || (current.indent > 0 && spaces >= current.indent))
+      ) {
+        // A continuation: indented under the marker, or straight after the step's last line.
+        for (; current.blanks > 0; current.blanks--) current.lines.push('');
+        current.lines.push(line.slice(Math.min(current.indent, spaces)));
+      } else {
+        // An unindented paragraph after a blank line: a step of its own.
         closeStep();
-      } else if (current && line.trim() === '' && line.length < current.indent) {
-        // A blank line between numbered steps.
-      } else if (current) {
-        current.lines.push(line.slice(Math.min(current.indent, leadingSpaces(line))));
-      } else if (line.trim() !== '') {
-        step = { lines: [line.trim()], indent: 0 };
+        step = { lines: [line.trim()], indent: 0, blanks: 0 };
       }
     } else {
       notes.push(line);

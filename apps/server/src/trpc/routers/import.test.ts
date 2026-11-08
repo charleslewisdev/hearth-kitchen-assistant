@@ -305,6 +305,13 @@ Soften the onion in the oil, add the lentils and the stock, and simmer for half 
     expect(draft.ingredientLines.value.length).toBeGreaterThan(0);
   });
 
+  it('sends a paste that opens with a horizontal rule to the text heuristics', async () => {
+    const caller = await uploadCaller();
+    const draft = await caller.import.fromText({ text: `---\n${PASTED}\n---\n` });
+    expect(draft.source).toEqual({ kind: 'text' });
+    expect(draft.ingredientLines.value).toHaveLength(4);
+  });
+
   it('says so when the text had no recipe in it', async () => {
     const caller = await uploadCaller();
     await expect(

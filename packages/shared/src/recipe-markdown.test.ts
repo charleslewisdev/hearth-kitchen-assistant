@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import {
-  hasFrontMatter,
   parseRecipeMarkdown,
   recipeMarkdownFileName,
   recipeToMarkdown,
@@ -128,6 +127,31 @@ describe('parseRecipeMarkdown', () => {
     expect(parseRecipeMarkdown(recipeToMarkdown(bare))).toEqual(bare);
   });
 
+  it('round-trips the text a line-by-line format finds hardest', () => {
+    const awkward: MarkdownRecipe = {
+      ...rich,
+      title: 'Back\\slash, “curly” and émigré: a \t tab',
+      sourceName: 'Line one\nline two',
+      tags: ['a, with a comma', '#hash', '"quoted"'],
+      ingredientLines: ['## not a heading', '1. not a step', '[[Linked]] only'],
+      steps: [
+        'Mix.\n\nThen rest, after a blank line.',
+        '- starts like a bullet',
+        '## starts like a heading',
+        'Ends on a list:\n- one\n- two',
+        'Two blank lines\n\n\nin a row.',
+      ],
+      description: '---\nNotes that open with a rule.\n## Ingredients\n- not one',
+    };
+    expect(parseRecipeMarkdown(recipeToMarkdown(awkward))).toEqual(awkward);
+  });
+
+  it('keeps a blank line inside a step after an editor strips trailing spaces', () => {
+    const recipe = { ...rich, steps: ['Mix.\n\nThen rest.', 'Bake.'] };
+    const saved = recipeToMarkdown(recipe).replace(/ +\n/g, '\n');
+    expect(parseRecipeMarkdown(saved)?.steps).toEqual(['Mix.\n\nThen rest.', 'Bake.']);
+  });
+
   it('round-trips more than nine steps, whose markers grow a digit', () => {
     const many = { ...rich, steps: Array.from({ length: 12 }, (_, i) => `Step ${i}\nmore ${i}`) };
     expect(parseRecipeMarkdown(recipeToMarkdown(many))?.steps).toEqual(many.steps);
@@ -136,7 +160,13 @@ describe('parseRecipeMarkdown', () => {
   it('is null for text without front matter, so the text heuristics take it', () => {
     expect(parseRecipeMarkdown('# Toast\n\n## Ingredients\n- 1 slice bread\n')).toBeNull();
     expect(parseRecipeMarkdown('---\nnot closed\n')).toBeNull();
-    expect(hasFrontMatter('Toast\n---\n')).toBe(false);
+    expect(parseRecipeMarkdown('Toast\n---\ntitle: x\n---\n')).toBeNull();
+  });
+
+  it('is null for a paste that opens with a horizontal rule rather than front matter', () => {
+    expect(
+      parseRecipeMarkdown("---\nGrandma's Soup\n2 cups stock\n---\n1. Simmer it.\n"),
+    ).toBeNull();
   });
 
   it('survives Windows line ends and a byte-order mark', () => {
@@ -153,7 +183,7 @@ describe('parseRecipeMarkdown', () => {
       'types: [dinner, Lunch, pudding]',
       'tags:',
       '  - quick',
-      '  - "one pot"',
+      '- "one pot"',
       '# a comment',
       'unknown_key: ignored',
       '---',
@@ -210,21 +240,44 @@ describe('parseRecipeMarkdown', () => {
     });
   });
 
-  it('stays linear on hostile input', () => {
-    const started = Date.now();
-    const runs = [
-      '---\n' + 'a'.repeat(200_000),
-      '---\n' + 'title: ' + '"'.repeat(100_000) + '\n---\n',
-      '---\ntitle: x\n---\n## Method\n' + '1'.repeat(100_000) + '. x\n',
-      '---\ntitle: x\n---\n## Method\n' + ' '.repeat(100_000) + 'x\n',
-      '---\ntitle: x\n---\n' + '#'.repeat(100_000) + '\n',
-      '---\ntitle: x\n---\n## Ingredients\n' + '- '.repeat(100_000) + '\n',
-      '---\n' + 'tags: [' + 'a,'.repeat(50_000) + '\n---\n',
-      '---\n' + ':'.repeat(100_000) + '\n---\n',
-      '---\ntitle: x\n---\n' + '\n'.repeat(100_000),
+  it('stays linear on hostile input, each shape on its own clock', () => {
+    const closedTags = `---\ntags: [${'"a",'.repeat(12_000)}"a"]\n---\n`;
+    const runs: [string, string][] = [
+      ['unclosed front matter', '---\n' + 'a'.repeat(200_000)],
+      ['a run of quotes as a value', '---\ntitle: ' + '"'.repeat(49_000) + '\n---\n'],
+      ['a closed flow list at the cap', closedTags],
+      ['bare flow list items', `---\ntags: [${'a,'.repeat(24_000)}a]\n---\n`],
+      ['a long block list', '---\ntags:\n' + '  - x\n'.repeat(8_000) + '---\n'],
+      ['front matter just over the cap', '---\ntitle: x\n' + 'a'.repeat(50_000) + '\n---\n'],
+      ['a run of colons', '---\n' + ':'.repeat(49_000) + '\ntitle: x\n---\n'],
+      ['digits before a marker', '---\ntitle: x\n---\n## Method\n' + '1'.repeat(100_000) + '. x\n'],
+      ['spaces before a step', '---\ntitle: x\n---\n## Method\n' + ' '.repeat(100_000) + 'x\n'],
+      ['many steps', '---\ntitle: x\n---\n## Method\n' + '1. x\n   y\n\n'.repeat(10_000)],
+      [
+        'many blank lines in a step',
+        '---\ntitle: x\n---\n## Method\n1. x\n' + '\n'.repeat(100_000) + '   y\n',
+      ],
+      ['a run of hashes', '---\ntitle: x\n---\n' + '#'.repeat(100_000) + '\n'],
+      [
+        'a run of list markers',
+        '---\ntitle: x\n---\n## Ingredients\n' + '- '.repeat(50_000) + '\n',
+      ],
+      ['a run of headings', '---\ntitle: x\n---\n' + '## x\n'.repeat(20_000)],
+      ['a run of newlines', '---\ntitle: x\n---\n' + '\n'.repeat(100_000)],
     ];
-    for (const run of runs) parseRecipeMarkdown(run);
-    expect(Date.now() - started).toBeLessThan(1000);
+    for (const [name, run] of runs) {
+      const started = Date.now();
+      parseRecipeMarkdown(run);
+      expect([name, Date.now() - started < 200]).toEqual([name, true]);
+    }
+    // The writer too: notes and steps are the household's own text, and have no small cap.
+    const started = Date.now();
+    recipeToMarkdown({
+      ...rich,
+      description: 'x' + '\n'.repeat(100_000) + 'y',
+      steps: ['a' + '\n'.repeat(100_000)],
+    });
+    expect(Date.now() - started).toBeLessThan(200);
   });
 });
 

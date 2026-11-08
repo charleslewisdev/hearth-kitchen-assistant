@@ -270,10 +270,17 @@ export function ImportReview({
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => line !== '');
-  const stepLines = steps.text
-    .split(/\n{2,}/)
-    .map((step) => step.trim())
-    .filter((step) => step !== '');
+  // A Markdown file's steps arrive as a list and may hold blank lines of their own, which the
+  // box below cannot tell from the gap between two steps. They are saved as the file had them
+  // until the cook edits the box; from then on the box is what the cook says.
+  const [stepsEdited, setStepsEdited] = useState(false);
+  const stepLines =
+    fromFile && !stepsEdited
+      ? draft.steps.value
+      : steps.text
+          .split(/\n{2,}/)
+          .map((step) => step.trim())
+          .filter((step) => step !== '');
 
   const canSave =
     title.value.trim() !== '' && typedSourceUrl !== 'invalid' && !create.isPending && !keeping;
@@ -561,9 +568,18 @@ export function ImportReview({
             className={steps.flagged ? styles.textareaFlagged : styles.textarea}
             aria-describedby={describedBy('steps-flag', steps.flagged)}
             value={steps.text}
-            onChange={(e) => setSteps({ ...steps, text: e.target.value, flagged: false })}
+            onChange={(e) => {
+              setStepsEdited(true);
+              setSteps({ ...steps, text: e.target.value, flagged: false });
+            }}
           />
         </label>
+        {fromFile && !stepsEdited && draft.steps.value.some((step) => step.includes('\n\n')) && (
+          <Flag id="steps-paragraphs">
+            A step in the file has a blank line inside it. It is saved as one step, as the file has
+            it, unless you edit the steps here.
+          </Flag>
+        )}
         {steps.flagged && (
           <Flag id="steps-flag">
             {`The split into steps is a guess, worked out from the ${noun}.`}

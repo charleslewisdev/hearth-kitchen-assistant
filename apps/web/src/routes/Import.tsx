@@ -45,7 +45,7 @@ const TOO_LARGE = {
   image: 'That photo is too large to import. Take it again at a smaller size.',
 } as const;
 
-const MARKDOWN_TOO_LONG = 'That file is too long to import. Export one recipe at a time.';
+const MARKDOWN_TOO_LONG = 'That file is too long to import. Hearth reads one recipe per file.';
 const MARKDOWN_EMPTY = 'There is nothing in that file.';
 
 const TOO_MANY_PHOTOS = `Choose up to ${MAX_IMAGES_PER_IMPORT} photos for one recipe.`;

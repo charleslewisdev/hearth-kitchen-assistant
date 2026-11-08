@@ -57,6 +57,7 @@ const RICH = {
   steps: [
     'Heat the oven to 220°C.',
     'Toast the barley.\nThen add the stock a ladle at a time.\n  Keep stirring.',
+    'Rest it.\n\nA blank line inside this step stays inside it.',
     '10. Rest for ten minutes.',
   ],
   description: 'Notes, line one.\n\n## A heading inside the notes\n- not an ingredient',
@@ -234,6 +235,15 @@ describe('the export downloads', () => {
     );
     expect(res.headers['x-content-type-options']).toBe('nosniff');
     expect(res.body).toBe((await exportRecipes(owner.householdId, id))[0]!.markdown);
+  });
+
+  it('sends an empty library as a zip with nothing in it but its folder', async () => {
+    const owner = await ownerWithHousehold();
+    const cookie = owner.headers.get('cookie') ?? '';
+    const res = await server.inject({ url: '/api/export/recipes.zip', headers: { cookie } });
+    expect(res.statusCode).toBe(200);
+    const names = Object.keys(unzipSync(new Uint8Array(res.rawPayload)));
+    expect(names.filter((name) => !name.endsWith('/'))).toEqual([]);
   });
 
   it('refuses anyone signed out, and another household’s recipe is a 404', async () => {

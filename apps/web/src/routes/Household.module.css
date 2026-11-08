@@ -224,7 +224,9 @@
 /* The export download: a link that looks like the secondary button. */
 .secondaryLink {
   composes: secondary;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   text-decoration: none;
 }
 
