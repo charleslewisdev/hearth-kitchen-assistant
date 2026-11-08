@@ -9,7 +9,7 @@ _Last updated: 2026-11-08 (zod lives in the server, D57; one app image, D46; off
 | Area               | Decision                                                     | Rationale                                                                                                                      |
 | ------------------ | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
 | **Language/stack** | TypeScript full-stack                                        | One language end to end; matches the author's existing projects; huge ecosystem.                                               |
-| **Frontend**       | React + Vite, as a **PWA**                                   | Mobile-first cooking context; installable; offline-capable core.                                                               |
+| **Frontend**       | React + Vite, as a **PWA**                                   | Mobile-first cooking context; installable; an offline shopping list.                                                           |
 | **API**            | Node + **Fastify** with **tRPC**                             | End-to-end type safety from DB to UI; fast; low ceremony.                                                                      |
 | **Database**       | **Postgres**                                                 | Relational integrity for recipes/plans/lists; strong JSON support; row-level scoping for tenancy.                              |
 | **Auth**           | **Better Auth** (embedded); optional OIDC planned, not built | Ships in the box (no cloud dependency for self-host); Organizations plugin = household/tenant; OIDC for homelabbers.           |
@@ -44,7 +44,7 @@ _Last updated: 2026-11-08 (zod lives in the server, D57; one app image, D46; off
 
 - The tenant unit is the **household** (Better Auth "organization"). A user belongs to one or more households.
 - **Every domain table carries `household_id`.** Every query is tenant-scoped by default — enforced at the data-access layer (`withHousehold()` in `apps/server/src/repo/tenant.ts`), not left to callers.
-- **Postgres Row-Level Security sits behind the repo layer** (D31): the app connects as an unprivileged role, and every domain table's policy matches the active household. A forgotten `WHERE` returns nothing rather than another household's rows.
+- **Postgres Row-Level Security sits behind the repo layer** (D31): each `withHousehold()` transaction drops to the unprivileged `hearth_app` role and sets the active household, which every domain table's policy matches. A forgotten `WHERE` returns nothing rather than another household's rows.
 - Single-tenant self-host is simply "one household." An instance holds exactly one household by default, behind a runtime toggle (D41), so public multi-tenant signup is a toggle plus a signup flow, **not** a schema migration.
 
 ## Auth posture
@@ -66,7 +66,7 @@ The single most important architectural rule: **AI is an enhancement, never a de
 ## Cross-cutting concerns
 
 - **Data portability:** export everything. Recipes export as Markdown, one file or the whole library as a zip, and import back (D52). Photos, plans, the cook log and the shopping list are not exported yet, and there is no full account export.
-- **Offline:** the service worker precaches the app shell. The shopping list opens with no signal from this phone's last copy, and changes made offline are queued and sent on reconnect (D56). Cook mode keeps ticked steps and timers across a reload on the device (D47). Recipes are not kept offline, and edits made offline on two phones have no conflict rule yet ([#11](https://github.com/charleslewisdev/hearth-kitchen-assistant/issues/11)).
+- **Offline:** the service worker precaches the app shell. The shopping list opens with no signal from the device's last copy, and changes made offline are queued and sent on reconnect (D56). Cook mode keeps ticked steps and timers across a reload on the device (D47). Recipes are not kept offline, and edits made offline on two phones have no conflict rule yet ([#11](https://github.com/charleslewisdev/hearth-kitchen-assistant/issues/11)).
 - **Testing (first-class — see Decision 11):** the deterministic core (scaling, unit conversion, shopping aggregation, food-mapping, parsers) is built **test-first (TDD)** with thorough unit suites and is testable with no network/AI. Typed contracts (tRPC, with zod validating input in the server's routers) plus tests at the router and repo boundary, and Playwright end-to-end specs. **CI gates on green** before any merge.
 - **Observability:** structured JSON logs (pino via Fastify) with an ids-only rule: never recipe content, ingredient text or email bodies (D38, D40). `LOG_LEVEL` sets the verbosity.
 

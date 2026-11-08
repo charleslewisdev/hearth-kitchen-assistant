@@ -65,13 +65,13 @@ The polish trimmed out of the Grocery MVP, added back as fast-follows: cook mode
 URL import (deterministic) → image OCR → PDF → text/.doc, all normalized to the canonical format. Enrichment interface with deterministic baseline + optional LLM/OCR provider.
 **Exit:** a user can import a week of recipes from mixed sources with consistent output.
 **Done 2026-09-10** (branch `feat/cook-search-import`): **1101 tests**, up from 743 at the start of the milestone. `packages/enrichment` created at last, with one `RecipeDraft` shape from four sources that fall back into each other, saving through the existing `recipe.create` so there is no second write path. The LLM provider is deliberately **not** built: D14 makes it optional and makes in-the-box OCR mandatory, and tesseract satisfies that alone on a rotated, unevenly lit, blurred page. **The image and PDF fixtures are synthetic, so real cookbook photos are untested** - two-column pages interleave and a wrapped ingredient line becomes two entries. If the owner's own books defeat the baseline, that is the evidence for the LLM provider D14 held in reserve.
-**Since then:** photo and PDF import has carried real cookbook pages in daily use without an LLM provider. Parser drafts are kept for review (D51), wrapped ingredient lines are joined (#24), and Word documents import too (D55). The remaining OCR weak spots are in [#10](https://github.com/charleslewisdev/hearth-kitchen-assistant/issues/10).
+**Since then:** photo and PDF import has carried real cookbook pages in daily use without an LLM provider. Parser drafts are kept so parser failures can be studied (D51), wrapped ingredient lines are joined ([PR #24](https://github.com/charleslewisdev/hearth-kitchen-assistant/pull/24), 2026-11-08), and Word documents import too (D55). The remaining OCR weak spots are in [#10](https://github.com/charleslewisdev/hearth-kitchen-assistant/issues/10).
 
 ### P3 — Plan & shop 🟦 _(list slice pulled into the Grocery MVP; planner MVP 2026-09-23)_
 
 The shopping-list core (generate from recipes, free-form editing, sink-away check-off, department sorting) ships early in the Grocery MVP. P3 proper then adds the **planning** layer on top: assign recipes to days (calendar/agenda), freshness-aware sequencing, multiple named lists / store layouts, cross-unit aggregation, and printing.
 **Exit:** a user can plan a week (day-assigned, freshness-aware) and the list reflects it.
-**Planner MVP done 2026-09-23** (#11): day-assigned week planning and Build shopping list.
+**Planner MVP done 2026-09-23** (private PR #11): day-assigned week planning and Build shopping list.
 **2026-11-08:** list amounts are changed in place (D54) and the list prints from the Shop tab (#27).
 Still open for P3: store layouts and more than one list ([#16](https://github.com/charleslewisdev/hearth-kitchen-assistant/issues/16)), cross-unit aggregation
 ([#17](https://github.com/charleslewisdev/hearth-kitchen-assistant/issues/17)), drag and drop between slots ([#18](https://github.com/charleslewisdev/hearth-kitchen-assistant/issues/18)), and a servings change after Build reaching the
@@ -134,7 +134,7 @@ Resolved during 2026-06-19 P0 execution:
 
 Deferred from P0:
 
-- **PWA offline-sync conflict resolution** — still open, now [#11](https://github.com/charleslewisdev/hearth-kitchen-assistant/issues/11) (first recorded as #9 in the [deferred/hardening backlog](https://github.com/charleslewisdev/hearth-kitchen-assistant/blob/670fb00a1a487f6079559506ae1da19b5c35b341/docs/plans/2026-06-19-p0-deferred-and-hardening.md)).
+- **PWA offline-sync conflict resolution**: still open, now [#11](https://github.com/charleslewisdev/hearth-kitchen-assistant/issues/11) (first recorded as #9 in the [deferred/hardening backlog](https://github.com/charleslewisdev/hearth-kitchen-assistant/blob/670fb00a1a487f6079559506ae1da19b5c35b341/docs/plans/2026-06-19-p0-deferred-and-hardening.md)).
 - ~~**Public-instance readiness**~~ **Built as P0.5, 2026-09-09 (D36–D42):** email verification, auth rate limiting, first-boot secret generation and running behind a TLS-terminating proxy.
 
 Surfaced by the 2026-06-18 P0 plan stress test (details + rationale in [DECISION_LOG.md](DECISION_LOG.md#pending-decisions)) — still open, answer before the phase each gates:
