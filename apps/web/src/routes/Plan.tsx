@@ -23,6 +23,7 @@ type Entry = {
   meal: string;
   servings: number;
   onList: boolean;
+  listServings: number | null;
   recipe: { id: string; slug: string; title: string; servings: number };
 };
 
@@ -93,6 +94,12 @@ export function Plan() {
   const [dragged, setDragged] = useState<Entry | null>(null);
   const [dropOver, setDropOver] = useState<string | null>(null);
   const remove = trpc.plan.remove.useMutation({ onSuccess: invalidate });
+  const syncList = trpc.plan.syncListServings.useMutation({
+    onSuccess: () => {
+      void invalidate();
+      void utils.shoppingList.get.invalidate();
+    },
+  });
   const build = trpc.plan.buildList.useMutation({
     onSuccess: (result) => {
       setBuilt(result.added);
@@ -223,6 +230,17 @@ export function Plan() {
             <Link to="/shop">Open the list</Link>
           </p>
         )}
+        {/* A refused move or servings change has already been put back on screen; say so. */}
+        {update.isError && (
+          <p className={styles.error} role="alert">
+            Couldn’t save that change, so the meal is back as it was. Please try again.
+          </p>
+        )}
+        {syncList.isError && (
+          <p className={styles.error} role="alert">
+            Couldn’t update the shopping list. Please try again.
+          </p>
+        )}
       </header>
 
       <div className={styles.days}>
@@ -280,6 +298,10 @@ export function Plan() {
                           : {})}
                         onServings={(servings) => update.mutate({ id: entry.id, servings })}
                         onMove={() => setMoving(entry)}
+                        onSyncList={(choice) => syncList.mutate({ id: entry.id, choice })}
+                        // Also while a servings change is still on its way: the server would
+                        // answer for the count before it.
+                        syncing={syncList.isPending || update.isPending}
                         onRemove={() => remove.mutate({ id: entry.id })}
                         // Today's and earlier meals only: a meal cannot have been cooked yet.
                         {...(entry.date <= today
@@ -372,6 +394,8 @@ function EntryRow({
   onMove,
   onRemove,
   onCooked,
+  onSyncList,
+  syncing,
 }: {
   entry: Entry;
   // Present on a desktop only: the row can be picked up and dropped on another slot.
@@ -380,8 +404,14 @@ function EntryRow({
   onMove: () => void;
   onRemove: () => void;
   onCooked?: () => void;
+  onSyncList: (choice: 'update' | 'leave') => void;
+  syncing: boolean;
 }) {
   const title = entry.recipe.title;
+  // The servings changed after Build shopping list added this meal (D61): ask, never change the
+  // list behind the cook's back.
+  const listBehind =
+    entry.onList && entry.listServings !== null && entry.listServings !== entry.servings;
   const dragProps: HTMLAttributes<HTMLLIElement> & { draggable?: boolean } = drag
     ? {
         draggable: true,
@@ -453,6 +483,32 @@ function EntryRow({
           ×
         </button>
       </div>
+      {listBehind && (
+        <div className={styles.listBehind} role="status">
+          <span>
+            The list has amounts for {entry.listServings}{' '}
+            {entry.listServings === 1 ? 'serving' : 'servings'}.
+          </span>
+          <button
+            type="button"
+            className={styles.textButton}
+            disabled={syncing}
+            onClick={() => onSyncList('update')}
+            aria-label={`Update list for ${title}`}
+          >
+            Update list
+          </button>
+          <button
+            type="button"
+            className={styles.textButton}
+            disabled={syncing}
+            onClick={() => onSyncList('leave')}
+            aria-label={`Leave it for ${title}`}
+          >
+            Leave it
+          </button>
+        </div>
+      )}
     </li>
   );
 }

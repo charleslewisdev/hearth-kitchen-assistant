@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { resetDb } from '../../test/db';
 import { createHousehold, liftHouseholdCap } from '../../test/factories';
 import { createRecipe, deleteRecipe } from './recipes';
-import { getActiveList } from './shopping';
+import { getActiveList, setChecked, updateItem } from './shopping';
 import {
   addEntry,
   buildListForWeek,
@@ -10,6 +10,7 @@ import {
   getWeekStart,
   removeEntry,
   setWeekStart,
+  syncListServings,
   updateEntry,
 } from './plan';
 
@@ -199,5 +200,126 @@ describe('plan repository: build shopping list', () => {
     await addEntry(b, { date: WED, meal: 'dinner', recipeId: theirs.id, servings: 1 });
     expect(await buildListForWeek(a, '2026-09-20')).toEqual({ added: 0 });
     expect((await getWeek(b, WED)).entries[0]!.onList).toBe(false);
+  });
+});
+
+describe('plan repository: servings changed after the build (#12)', () => {
+  beforeEach(async () => {
+    await resetDb();
+  });
+
+  async function plannedSoup() {
+    const a = await createHousehold();
+    const soup = await createRecipe(a, {
+      title: 'Soup',
+      servings: 2,
+      ingredientLines: ['1 cup rice', '2 onions', 'salt to taste'],
+    });
+    const entry = await addEntry(a, { date: WED, meal: 'dinner', recipeId: soup.id, servings: 2 });
+    return { a, soup, entry };
+  }
+
+  it('remembers the servings the list holds, and shows the gap after a change', async () => {
+    const { a, entry } = await plannedSoup();
+    expect((await getWeek(a, WED)).entries[0]!.listServings).toBeNull();
+    await buildListForWeek(a, '2026-09-20');
+    expect((await getWeek(a, WED)).entries[0]!.listServings).toBe(2);
+
+    const changed = await updateEntry(a, entry.id, { servings: 6 });
+    expect(changed).toMatchObject({ servings: 6, listServings: 2 });
+  });
+
+  it('adds the difference to the list on update', async () => {
+    const { a, entry } = await plannedSoup();
+    await buildListForWeek(a, '2026-09-20');
+    await updateEntry(a, entry.id, { servings: 6 });
+
+    const synced = await syncListServings(a, entry.id, 'update');
+    expect(synced).toMatchObject({ servings: 6, listServings: 6 });
+    const { items } = await getActiveList(a);
+    expect(items.filter((i) => i.name === 'rice')).toEqual([
+      expect.objectContaining({ quantity: 3, unit: 'cup' }),
+    ]);
+    expect(items.find((i) => i.name.startsWith('onion'))?.quantity).toBe(6);
+    // "to taste" does not scale and is not added again.
+    expect(items.filter((i) => i.name === 'salt')).toHaveLength(1);
+  });
+
+  it('takes the difference off unchecked items and never off checked ones', async () => {
+    const { a, soup, entry } = await plannedSoup();
+    // A second meal keeps some rice on the list.
+    await addEntry(a, { date: '2026-09-24', meal: 'lunch', recipeId: soup.id, servings: 2 });
+    await buildListForWeek(a, '2026-09-20');
+    const onions = (await getActiveList(a)).items.find((i) => i.name.startsWith('onion'))!;
+    expect(onions.quantity).toBe(4);
+    await setChecked(a, onions.id, true); // already bought
+
+    await updateEntry(a, entry.id, { servings: 1 });
+    await syncListServings(a, entry.id, 'update');
+
+    const { items } = await getActiveList(a);
+    expect(items.find((i) => i.name === 'rice')?.quantity).toBe(1.5);
+    // Bought is bought: a checked item is never taken from.
+    expect(items.find((i) => i.name.startsWith('onion'))).toMatchObject({
+      quantity: 4,
+      checked: true,
+    });
+  });
+
+  it('takes the difference off an item kept in another unit of the family', async () => {
+    const a = await createHousehold();
+    const spoons = await createRecipe(a, {
+      title: 'Roux',
+      servings: 2,
+      ingredientLines: ['4 tbsp flour'],
+    });
+    const cups = await createRecipe(a, { title: 'Bread', servings: 1, ingredientLines: ['1 cup flour'] });
+    const entry = await addEntry(a, { date: WED, meal: 'dinner', recipeId: spoons.id, servings: 2 });
+    await addEntry(a, { date: WED, meal: 'lunch', recipeId: cups.id, servings: 1 });
+    await buildListForWeek(a, '2026-09-20');
+    // 4 tbsp + 1 cup, kept in cups (D58).
+    expect((await getActiveList(a)).items.find((i) => i.name === 'flour')).toMatchObject({
+      quantity: 1.25,
+      unit: 'cup',
+    });
+
+    await updateEntry(a, entry.id, { servings: 1 }); // 2 tbsp fewer
+    await syncListServings(a, entry.id, 'update');
+    expect((await getActiveList(a)).items.find((i) => i.name === 'flour')).toMatchObject({
+      quantity: 1.125,
+      unit: 'cup',
+    });
+  });
+
+  it('removes an item whose amount reaches zero', async () => {
+    const a = await createHousehold();
+    const soup = await createRecipe(a, { title: 'Soup', servings: 2, ingredientLines: ['1 cup rice'] });
+    const entry = await addEntry(a, { date: WED, meal: 'dinner', recipeId: soup.id, servings: 2 });
+    await buildListForWeek(a, '2026-09-20');
+    // Hand-edit the rice down, so taking 0.5 cup off empties it.
+    const rice = (await getActiveList(a)).items.find((i) => i.name === 'rice')!;
+    await updateItem(a, rice.id, { quantity: 0.5 });
+    await updateEntry(a, entry.id, { servings: 1 });
+    await syncListServings(a, entry.id, 'update');
+    expect((await getActiveList(a)).items.find((i) => i.name === 'rice')).toBeUndefined();
+  });
+
+  it('leaves the list alone on leave, and stops asking', async () => {
+    const { a, entry } = await plannedSoup();
+    await buildListForWeek(a, '2026-09-20');
+    await updateEntry(a, entry.id, { servings: 6 });
+
+    expect(await syncListServings(a, entry.id, 'leave')).toMatchObject({ listServings: 6 });
+    expect((await getActiveList(a)).items.find((i) => i.name === 'rice')?.quantity).toBe(1);
+  });
+
+  it('does nothing for a meal not on the list, or already in step', async () => {
+    const { a, entry } = await plannedSoup();
+    expect(await syncListServings(a, entry.id, 'update')).toMatchObject({ listServings: null });
+    expect((await getActiveList(a)).items).toHaveLength(0);
+
+    await buildListForWeek(a, '2026-09-20');
+    await syncListServings(a, entry.id, 'update');
+    expect((await getActiveList(a)).items.find((i) => i.name === 'rice')?.quantity).toBe(1);
   });
 });

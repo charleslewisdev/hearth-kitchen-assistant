@@ -138,7 +138,7 @@ export async function getActiveList(householdId: string): Promise<ActiveList> {
   return withHousehold(householdId, (tx) => loadActiveList(tx, householdId));
 }
 
-interface Candidate {
+export interface Candidate {
   foodId: string | null;
   name: string;
   quantity: number | null;
@@ -277,13 +277,32 @@ export async function addRecipeToListTx(
   recipeId: string,
   servings: number,
 ): Promise<void> {
-  const candidates = await recipeCandidates(tx, householdId, recipeId, () => servings, new Set(), {
-    left: MAX_EXPANSIONS,
-  });
+  const candidates = await recipeListCandidates(tx, householdId, recipeId, servings);
   if (!candidates) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Recipe not found' });
   }
+  await addCandidatesTx(tx, householdId, candidates);
+}
 
+// What adding a recipe at `servings` would put on the list, linked recipes expanded; null when
+// the household has no such recipe.
+export async function recipeListCandidates(
+  tx: Tx,
+  householdId: string,
+  recipeId: string,
+  servings: number,
+): Promise<Candidate[] | null> {
+  return recipeCandidates(tx, householdId, recipeId, () => servings, new Set(), {
+    left: MAX_EXPANSIONS,
+  });
+}
+
+// Put candidates on the active list, each merged into a matching item or added as its own row.
+export async function addCandidatesTx(
+  tx: Tx,
+  householdId: string,
+  candidates: Candidate[],
+): Promise<void> {
   const list = await getOrCreateList(tx, householdId);
   let position = await nextPosition(tx, list.id);
 
@@ -346,6 +365,58 @@ export async function addRecipeToListTx(
       sourceRecipeId: candidate.sourceRecipeId,
       position: position++,
     });
+  }
+}
+
+// Take `quantity` of a food in `unit` off the active list's unchecked recipe items: the item in
+// that unit first, then any in the same family (#12, D61). An item brought to zero is removed.
+// Checked items are bought and never taken from, so whatever cannot be taken is left alone.
+export async function subtractFromListTx(
+  tx: Tx,
+  householdId: string,
+  { foodId, quantity, unit }: { foodId: string; quantity: number; unit: string | null },
+): Promise<void> {
+  const list = await getOrCreateList(tx, householdId);
+  const family = unitFamily(unit);
+  const rows = await tx
+    .select({
+      id: shoppingListItem.id,
+      quantity: shoppingListItem.quantity,
+      unit: shoppingListItem.unit,
+    })
+    .from(shoppingListItem)
+    .where(
+      and(
+        eq(shoppingListItem.householdId, householdId),
+        eq(shoppingListItem.listId, list.id),
+        eq(shoppingListItem.source, 'recipe'),
+        eq(shoppingListItem.checked, false),
+        eq(shoppingListItem.foodId, foodId),
+        isNotNull(shoppingListItem.quantity),
+        unit === null
+          ? isNull(shoppingListItem.unit)
+          : family === null
+            ? eq(shoppingListItem.unit, unit)
+            : inArray(shoppingListItem.unit, unitsInFamily(family)),
+      ),
+    )
+    .orderBy(asc(shoppingListItem.position))
+    .for('update');
+  // The same unit first, so a cup comes off the cup row before a tbsp row is converted.
+  rows.sort((x, y) => Number(x.unit !== unit) - Number(y.unit !== unit));
+
+  let left = quantity; // in `unit`
+  for (const row of rows) {
+    if (left <= 0) break;
+    const toRow = row.unit === unit ? 1 : unitFactor(unit!, row.unit!);
+    if (toRow === null) continue;
+    const have = Number(row.quantity);
+    const take = Math.min(have, left * toRow);
+    const rest = Math.round((have - take) * 1000) / 1000;
+    const where = and(eq(shoppingListItem.householdId, householdId), eq(shoppingListItem.id, row.id));
+    if (rest <= 0) await tx.delete(shoppingListItem).where(where);
+    else await tx.update(shoppingListItem).set({ quantity: String(rest) }).where(where);
+    left -= take / toRow;
   }
 }
 

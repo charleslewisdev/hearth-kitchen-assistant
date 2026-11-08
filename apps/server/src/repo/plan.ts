@@ -6,7 +6,13 @@ import { withHousehold, type Tx } from './tenant';
 
 // A plan entry's meal slot: the `meal_type` enum, narrower than a recipe's types.
 type MealType = (typeof mealType.enumValues)[number];
-import { addRecipeToListTx } from './shopping';
+import {
+  addCandidatesTx,
+  addRecipeToListTx,
+  recipeListCandidates,
+  subtractFromListTx,
+  type Candidate,
+} from './shopping';
 
 // One planned meal as the Plan screen needs it: the entry, plus enough of its recipe to name it,
 // link to it and show the serving count it was written for.
@@ -16,6 +22,8 @@ export interface PlanEntry {
   meal: MealType;
   servings: number;
   onList: boolean;
+  // The servings the shopping list holds amounts for; null until Build shopping list adds it.
+  listServings: number | null;
   recipe: { id: string; slug: string; title: string; servings: number };
 }
 
@@ -59,6 +67,7 @@ async function entriesTx(tx: Tx, householdId: string, start: string, id?: string
       meal: mealPlanEntry.meal,
       servings: mealPlanEntry.servings,
       addedToListAt: mealPlanEntry.addedToListAt,
+      listServings: mealPlanEntry.listServings,
       recipeId: recipe.id,
       slug: recipe.slug,
       title: recipe.title,
@@ -86,6 +95,7 @@ async function entriesTx(tx: Tx, householdId: string, start: string, id?: string
       meal: r.meal,
       servings: r.servings,
       onList: r.addedToListAt !== null,
+      listServings: r.listServings,
       recipe: { id: r.recipeId, slug: r.slug, title: r.title, servings: r.recipeServings },
     }),
   );
@@ -208,9 +218,79 @@ export async function buildListForWeek(
       await addRecipeToListTx(tx, householdId, entry.recipeId, entry.servings);
       await tx
         .update(mealPlanEntry)
-        .set({ addedToListAt: sql`now()` })
+        .set({ addedToListAt: sql`now()`, listServings: entry.servings })
         .where(and(eq(mealPlanEntry.householdId, householdId), eq(mealPlanEntry.id, entry.id)));
     }
     return { added: pending.length };
+  });
+}
+
+// The total each food and unit comes to across candidates, for the ones that can be summed (a
+// Food and an amount); "to taste" and unmatched lines have nothing to take a difference of.
+function totals(candidates: Candidate[]): Map<string, { candidate: Candidate; quantity: number }> {
+  const byKey = new Map<string, { candidate: Candidate; quantity: number }>();
+  for (const c of candidates) {
+    if (c.foodId === null || c.quantity === null) continue;
+    const key = `${c.foodId}::${c.unit ?? ''}`;
+    const seen = byKey.get(key);
+    if (seen) seen.quantity += c.quantity;
+    else byKey.set(key, { candidate: c, quantity: c.quantity });
+  }
+  return byKey;
+}
+
+// After a planned meal's servings change, bring the list in step (#12, D61). On 'update', the
+// difference between the recipe at the servings on the list and at the planned servings is added
+// to the list, or taken off its unchecked items; on 'leave', the list is kept as it is. Either
+// way the list now counts as holding the planned servings, so the planner stops asking. A meal
+// not on the list, or already in step, is returned unchanged. Null when there is no such entry.
+export async function syncListServings(
+  householdId: string,
+  id: string,
+  choice: 'update' | 'leave',
+): Promise<PlanEntry | null> {
+  return withHousehold(householdId, async (tx) => {
+    const [entry] = await tx
+      .select({
+        recipeId: mealPlanEntry.recipeId,
+        servings: mealPlanEntry.servings,
+        listServings: mealPlanEntry.listServings,
+      })
+      .from(mealPlanEntry)
+      .where(and(eq(mealPlanEntry.householdId, householdId), eq(mealPlanEntry.id, id)))
+      .for('update');
+    if (!entry) return null;
+    if (entry.listServings === null || entry.listServings === entry.servings) {
+      return oneEntryTx(tx, householdId, id);
+    }
+
+    if (choice === 'update') {
+      const before = await recipeListCandidates(tx, householdId, entry.recipeId, entry.listServings);
+      const after = await recipeListCandidates(tx, householdId, entry.recipeId, entry.servings);
+      const was = totals(before ?? []);
+      const now = totals(after ?? []);
+      const adds: Candidate[] = [];
+      for (const key of new Set([...was.keys(), ...now.keys()])) {
+        const had = was.get(key);
+        const has = now.get(key);
+        const diff = Math.round(((has?.quantity ?? 0) - (had?.quantity ?? 0)) * 1000) / 1000;
+        const { candidate } = (has ?? had)!;
+        if (diff > 0) adds.push({ ...candidate, quantity: diff });
+        else if (diff < 0) {
+          await subtractFromListTx(tx, householdId, {
+            foodId: candidate.foodId!,
+            quantity: -diff,
+            unit: candidate.unit,
+          });
+        }
+      }
+      await addCandidatesTx(tx, householdId, adds);
+    }
+
+    await tx
+      .update(mealPlanEntry)
+      .set({ listServings: entry.servings })
+      .where(and(eq(mealPlanEntry.householdId, householdId), eq(mealPlanEntry.id, id)));
+    return oneEntryTx(tx, householdId, id);
   });
 }

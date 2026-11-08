@@ -255,7 +255,9 @@ export const shoppingListItem = pgTable(
 
 // One recipe planned for one meal on one day (D44). A slot may hold several entries.
 // `plan_date` is the household's calendar day, with no zone. `added_to_list_at` is set when
-// Build shopping list adds the entry, so a second build adds only what is new.
+// Build shopping list adds the entry, so a second build adds only what is new. `list_servings` is
+// the serving count the list holds amounts for; while it differs from `servings`, the planner
+// offers to update the list (#12, D61).
 export const mealPlanEntry = pgTable(
   'meal_plan_entry',
   {
@@ -268,11 +270,16 @@ export const mealPlanEntry = pgTable(
       .references(() => recipe.id, { onDelete: 'cascade' }),
     servings: integer('servings').notNull(),
     addedToListAt: timestamp('added_to_list_at', { withTimezone: true }),
+    listServings: integer('list_servings'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     byHouseholdDate: index('meal_plan_entry_household_date_idx').on(t.householdId, t.planDate),
     servingsPositive: check('meal_plan_entry_servings_positive', sql`${t.servings} > 0`),
+    listServingsPositive: check(
+      'meal_plan_entry_list_servings_positive',
+      sql`${t.listServings} is null or ${t.listServings} > 0`,
+    ),
   }),
 );
 

@@ -33,6 +33,10 @@ export const planRouter = router({
   remove: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(({ ctx, input }) => plan.removeEntry(ctx.householdId, input.id)),
+  // After a servings change on a meal already on the list: update the list, or leave it (#12).
+  syncListServings: protectedProcedure
+    .input(z.object({ id: z.string().uuid(), choice: z.enum(['update', 'leave']) }))
+    .mutation(({ ctx, input }) => plan.syncListServings(ctx.householdId, input.id, input.choice)),
   buildList: protectedProcedure
     .input(z.object({ start: isoDate }))
     .mutation(({ ctx, input }) => plan.buildListForWeek(ctx.householdId, input.start)),
