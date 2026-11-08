@@ -50,7 +50,7 @@ const LONGEST_ENTITY = 10;
 
 /** One character reference as text, or null when it is not one this scanner decodes. */
 function entity(body: string): string | null {
-  if (body in NAMED) return NAMED[body]!;
+  if (Object.hasOwn(NAMED, body)) return NAMED[body]!;
   if (body.charCodeAt(0) !== 35 /* # */) return null;
   const hex = body[1] === 'x' || body[1] === 'X';
   const digits = body.slice(hex ? 2 : 1);

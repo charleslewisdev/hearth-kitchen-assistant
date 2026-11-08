@@ -1,5 +1,6 @@
 """
-Writes test/fixtures/word-recipe.docx, an invented recipe saved by python-docx.
+Writes test/fixtures/word-recipe.docx, an invented recipe saved by python-docx, and
+word-no-recipe.docx beside it, a document with no recipe in it.
 
 python-docx starts from Word's own default template, so the package has the parts a real Word
 file has: relationships, styles.xml with "List Number" and "List Bullet" numbering their
@@ -12,18 +13,29 @@ import sys
 
 import docx
 
-out = sys.argv[1] if len(sys.argv) > 1 else "packages/enrichment/test/fixtures/word-recipe.docx"
+folder = sys.argv[1] if len(sys.argv) > 1 else "packages/enrichment/test/fixtures"
 
-d = docx.Document()
-props = d.core_properties
-props.author = "Hearth tests"
-props.last_modified_by = "Hearth tests"
-props.title = ""
-props.comments = ""
-fixed = datetime.datetime(2026, 1, 1)
-props.created = fixed
-props.modified = fixed
-props.revision = 1
+
+def new_document():
+    d = docx.Document()
+    props = d.core_properties
+    props.author = "Hearth tests"
+    props.last_modified_by = "Hearth tests"
+    props.title = ""
+    props.comments = ""
+    fixed = datetime.datetime(2026, 1, 1)
+    props.created = fixed
+    props.modified = fixed
+    props.revision = 1
+    return d
+
+
+notes = new_document()
+notes.add_heading("Allotment meeting", level=1)
+notes.add_paragraph("We agreed to repaint the shed in spring and to share the new hose.")
+notes.save(f"{folder}/word-no-recipe.docx")
+
+d = new_document()
 
 d.add_heading("Brown Butter Oat Bars", level=1)
 d.add_paragraph("A tray bake for a bake sale. Makes 16 bars.")
@@ -52,4 +64,4 @@ for line in [
     "Scatter the topping over and bake for 25 minutes. Cool in the pan and cut into 16 bars.",
 ]:
     d.add_paragraph(line, style="List Number")
-d.save(out)
+d.save(f"{folder}/word-recipe.docx")

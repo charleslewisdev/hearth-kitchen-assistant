@@ -1158,7 +1158,7 @@ describe('the body an import upload needs', () => {
   });
 
   it('takes the largest Word document an import accepts', async () => {
-    // The body limit is derived from the PDF and photo caps; a Word upload has to fit too.
+    // The body limit is derived from every upload cap, the Word document's included.
     const res = await app.inject({
       method: 'POST',
       url: '/trpc/import.fromDocx',

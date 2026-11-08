@@ -96,4 +96,4 @@ export const TAG_NAME_TAKEN_MESSAGE =
  * screen says it about a `.doc` file name before uploading anything.
  */
 export const OLD_WORD_DOCUMENT_MESSAGE =
-  'Hearth can only read .docx files, and this is an older Word document (.doc) or a password-protected one. Open it in Word and save it as .docx, or copy the recipe and use Text.';
+  'Hearth could not open that Word document. It may be an older .doc file, or protected with a password. Save it as .docx without a password, or copy the recipe and use Text.';

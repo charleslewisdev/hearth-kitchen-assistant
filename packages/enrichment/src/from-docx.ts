@@ -146,12 +146,39 @@ interface Level {
   start: number;
 }
 
-/** A list instance: its levels, by `w:ilvl`. */
-type ListLevels = Map<number, Level>;
+/** Word's list levels are 0 to 8. */
+const MAX_LIST_LEVEL = 8;
 
-/** Every `w:num` in `numbering.xml`, as the levels it numbers with. */
-function readNumbering(xml: string, check: () => void): Map<string, ListLevels> {
-  const abstract = new Map<string, ListLevels>();
+/**
+ * A list level from an attribute, or null when it is not one Word could have written.
+ *
+ * Checked because it indexes the counters in `readBody`: a level of -5 or 4294967295 there threw
+ * a RangeError, which escaped as a 500 rather than an answer.
+ */
+function listLevel(value: string | undefined): number | null {
+  const n = Number(value ?? 0);
+  return Number.isInteger(n) && n >= 0 && n <= MAX_LIST_LEVEL ? n : null;
+}
+
+/** A list's starting number from an attribute; 0 is a start Word allows. */
+function startNumber(value: string | undefined): number | null {
+  const n = Number(value);
+  return Number.isSafeInteger(n) && n >= 0 ? n : null;
+}
+
+/** Looks up how a list numbers a level: `levelOf(numId, ilvl)`. */
+type Lists = (numId: string, ilvl: number) => Level | undefined;
+
+/**
+ * The lists in `numbering.xml`, looked up rather than expanded.
+ *
+ * Each `w:num` points at an `w:abstractNum` and may override where a level starts. Expanding
+ * every num into every level of its abstract up front is the product of the two: 5,000 of each,
+ * a 25KB upload, blocked the server for 1.9s, and 10,000 ran it out of memory. So a level is
+ * resolved only when a paragraph asks for it.
+ */
+function readNumbering(xml: string, check: () => void): Lists {
+  const abstract = new Map<string, Map<number, Level>>();
   const nums = new Map<string, { abstractId: string; starts: Map<number, number> }>();
 
   let abstractId: string | null = null;
@@ -167,20 +194,21 @@ function readNumbering(xml: string, check: () => void): Map<string, ListLevels> 
           abstractId = parseAttributes(raw).get('abstractNumId') ?? null;
           if (abstractId !== null) abstract.set(abstractId, new Map());
         } else if (name === 'lvl' && abstractId !== null && num === null) {
-          const ilvl = Number(parseAttributes(raw).get('ilvl') ?? 0);
-          level = { ilvl, format: 'decimal', start: 1 };
+          const ilvl = listLevel(parseAttributes(raw).get('ilvl'));
+          level = ilvl === null ? null : { ilvl, format: 'decimal', start: 1 };
         } else if (name === 'numFmt' && level) {
           level.format = parseAttributes(raw).get('val') ?? 'decimal';
         } else if (name === 'start' && level) {
-          level.start = Number(parseAttributes(raw).get('val') ?? 1) || 1;
+          level.start = startNumber(parseAttributes(raw).get('val')) ?? 1;
         } else if (name === 'num') {
           num = { id: parseAttributes(raw).get('numId') ?? '', abstractId: '', starts: new Map() };
         } else if (name === 'abstractNumId' && num) {
           num.abstractId = parseAttributes(raw).get('val') ?? '';
         } else if (name === 'lvlOverride' && num) {
-          overrideLevel = Number(parseAttributes(raw).get('ilvl') ?? 0);
+          overrideLevel = listLevel(parseAttributes(raw).get('ilvl'));
         } else if (name === 'startOverride' && num && overrideLevel !== null) {
-          num.starts.set(overrideLevel, Number(parseAttributes(raw).get('val') ?? 1) || 1);
+          const start = startNumber(parseAttributes(raw).get('val'));
+          if (start !== null) num.starts.set(overrideLevel, start);
         }
       },
       close(name) {
@@ -201,15 +229,11 @@ function readNumbering(xml: string, check: () => void): Map<string, ListLevels> 
     check,
   );
 
-  const lists = new Map<string, ListLevels>();
-  for (const [id, { abstractId: from, starts }] of nums) {
-    const levels: ListLevels = new Map();
-    for (const [ilvl, lvl] of abstract.get(from) ?? []) {
-      levels.set(ilvl, { format: lvl.format, start: starts.get(ilvl) ?? lvl.start });
-    }
-    lists.set(id, levels);
-  }
-  return lists;
+  return (numId, ilvl) => {
+    const found = nums.get(numId);
+    const lvl = found && abstract.get(found.abstractId)?.get(ilvl);
+    return lvl ? { format: lvl.format, start: found.starts.get(ilvl) ?? lvl.start } : undefined;
+  };
 }
 
 /** A paragraph style's list, followed through `w:basedOn`. */
@@ -231,6 +255,8 @@ function readStyleLists(
   let current: StyleList | null = null;
   let id = '';
   let inParagraphProperties = false;
+  /** Inside a tracked change's record of the old properties, which are not the style's now. */
+  let inChange = 0;
 
   scanXml(
     xml,
@@ -243,6 +269,8 @@ function readStyleLists(
             attrs.get('type') === 'paragraph' ? { numId: null, ilvl: null, basedOn: null } : null;
         } else if (!current) {
           return;
+        } else if (name === 'pPrChange' || name === 'rPrChange' || inChange > 0) {
+          inChange++;
         } else if (name === 'basedOn') {
           current.basedOn = parseAttributes(raw).get('val') ?? null;
         } else if (name === 'pPr') {
@@ -250,10 +278,14 @@ function readStyleLists(
         } else if (name === 'numId' && inParagraphProperties) {
           current.numId = parseAttributes(raw).get('val') ?? null;
         } else if (name === 'ilvl' && inParagraphProperties) {
-          current.ilvl = Number(parseAttributes(raw).get('val') ?? 0);
+          current.ilvl = listLevel(parseAttributes(raw).get('val'));
         }
       },
       close(name) {
+        if (inChange > 0) {
+          inChange--;
+          return;
+        }
         if (name === 'pPr') inParagraphProperties = false;
         if (name === 'style') {
           if (current) styles.set(id, current);
@@ -312,7 +344,7 @@ interface Paragraph {
  */
 function readBody(
   xml: string,
-  lists: Map<string, ListLevels>,
+  levelOf: Lists,
   styleLists: Map<string, { numId: string; ilvl: number }>,
   check: () => void,
 ): string {
@@ -346,7 +378,7 @@ function readBody(
     const numId = p.numId ?? fromStyle?.numId ?? null;
     if (numId === null || numId === '0') return '';
     const ilvl = p.ilvl ?? fromStyle?.ilvl ?? 0;
-    const level = lists.get(numId)?.get(ilvl);
+    const level = levelOf(numId, ilvl);
     if (level?.format === 'none') return '';
     if (!level || !NUMBERED_FORMATS.has(level.format)) return '• ';
 
@@ -358,8 +390,21 @@ function readBody(
     return `${counts[ilvl]}. `;
   };
 
-  /** Elements whose content is not the document's text: deletions, and the duplicate fallback. */
-  const SKIPPED = new Set(['del', 'moveFrom', 'Fallback', 'instrText', 'delText', 'rPr', 'sectPr']);
+  /**
+   * Elements whose content is not the document as it stands: deletions, field codes, the duplicate
+   * fallback of a text box, and a tracked change's record of the old paragraph properties, whose
+   * `numPr` and `pStyle` would otherwise overwrite the current ones.
+   */
+  const SKIPPED = new Set([
+    'del',
+    'moveFrom',
+    'Fallback',
+    'instrText',
+    'delText',
+    'rPr',
+    'sectPr',
+    'pPrChange',
+  ]);
 
   scanXml(
     xml,
@@ -386,7 +431,7 @@ function readBody(
         } else if (name === 'numId' && parent === 'numPr') {
           p.numId = parseAttributes(raw).get('val') ?? null;
         } else if (name === 'ilvl' && parent === 'numPr') {
-          p.ilvl = Number(parseAttributes(raw).get('val') ?? 0) || 0;
+          p.ilvl = listLevel(parseAttributes(raw).get('val')) ?? 0;
         } else if (parent === 'r') {
           if (name === 'tab') p.text += '\t';
           else if (name === 'br' || name === 'cr') p.text += '\n';
@@ -486,9 +531,10 @@ export function textFromDocx(
     const numberingXml = readPart(related.get(NUMBERING) ?? resolveTarget(main, 'numbering.xml'));
     const stylesXml = readPart(related.get(STYLES) ?? resolveTarget(main, 'styles.xml'));
 
-    const lists = numberingXml === null ? new Map() : readNumbering(numberingXml, check);
+    const levelOf: Lists =
+      numberingXml === null ? () => undefined : readNumbering(numberingXml, check);
     const styleLists = stylesXml === null ? new Map() : readStyleLists(stylesXml, check);
-    return { text: readBody(document, lists, styleLists, check) };
+    return { text: readBody(document, levelOf, styleLists, check) };
   } catch (error) {
     if (error instanceof TimedOut) return { reason: 'timed-out' };
     if (error instanceof TooMuchContent) return { reason: 'too-much-content' };

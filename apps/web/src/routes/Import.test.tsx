@@ -286,6 +286,28 @@ describe('importing a file', () => {
     expect(mutate.fromPdf).not.toHaveBeenCalled();
   });
 
+  it('knows a Word document by its media type when its name has no extension', async () => {
+    renderImport();
+    fireEvent.change(screen.getByLabelText(/pdf or word/i), {
+      target: {
+        files: [
+          new File([new Uint8Array([80, 75, 3, 4])], 'recipe', {
+            type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          }),
+        ],
+      },
+    });
+    await waitFor(() => expect(mutate.fromDocx).toHaveBeenCalledTimes(1));
+    expect(mutate.fromPdf).not.toHaveBeenCalled();
+  });
+
+  it('shows the server sentence when a Word document could not be read', () => {
+    const message = 'Hearth could not read that Word document.';
+    mockSource('fromDocx', { isError: true, error: { message } });
+    renderImport();
+    expect(screen.getByRole('alert')).toHaveTextContent(message);
+  });
+
   it('tells a cook with an old .doc what to do, without uploading it', async () => {
     renderImport();
     fireEvent.change(screen.getByLabelText(/pdf or word/i), {

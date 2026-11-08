@@ -119,13 +119,14 @@ export const PDF_FAILURE_MESSAGES: Record<PdfFailureReason, string> = {
  * `.docx` are both the older container format, and the way through for either is the same.
  */
 export const DOCX_FAILURE_MESSAGES: Record<DocxFailureReason, string> = {
-  'too-large': 'That document is too large to import. Try saving just the recipe in a new one.',
+  'too-large': 'That document is too large to import. Copy just the recipe into a new document.',
   'old-format': OLD_WORD_DOCUMENT_MESSAGE,
-  malformed: 'Hearth could not read that Word document. It may be damaged, or not a .docx file.',
+  malformed:
+    'Hearth could not read that Word document. It may be damaged, or not a .docx file. Copying the recipe into Text always works.',
   'too-much-content':
-    'There is far more text in that document than a recipe has. Try saving just the recipe in a new one.',
+    'There is far more text in that document than a recipe has. Copy just the recipe into a new document.',
   'timed-out':
-    'Reading that document took too long, so Hearth stopped. Try saving just the recipe.',
+    'Reading that document took too long, so Hearth stopped. Copy just the recipe into a new document.',
   'no-recipe':
     'No recipe was found in that document. An ingredient list with amounts on it is what Hearth looks for.',
 };

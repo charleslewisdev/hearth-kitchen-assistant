@@ -485,12 +485,32 @@ describe('import.fromDocx', () => {
 
     const warned = lines().find((l) => l.msg === 'import failed; upload kept');
     expect(warned).toMatchObject({ kind: 'docx', reason: 'malformed' });
-    if (!warned) return;
-    const dir = join(importFailuresRoot(), householdId, warned.failureId as string);
+    const dir = join(importFailuresRoot(), householdId, String(warned?.failureId));
     expect(readFileSync(join(dir, 'page-1.docx'))).toEqual(notADocx);
     const written = JSON.stringify(lines());
     expect(written).not.toContain('Rhubarb');
     expect(written).not.toContain(notADocx.toString('base64').slice(0, 16));
+  });
+
+  it('keeps a document with no recipe in it, with the text it read', async () => {
+    const { householdId } = await householdWithOwner();
+    const { sink, lines } = capture();
+    const caller = routerWith(async () => ({ ok: false, reason: 'unreachable' })).createCaller(
+      testContext({
+        householdId,
+        session: { userId: 'u' } as never,
+        log: createLogger({ level: 'info', pretty: false, destination: sink }),
+      }),
+    );
+    await expect(
+      caller.import.fromDocx({ fileBase64: upload('word-no-recipe.docx') }),
+    ).rejects.toThrow(DOCX_FAILURE_MESSAGES['no-recipe']);
+
+    const warned = lines().find((l) => l.msg === 'import failed; upload kept');
+    expect(warned).toMatchObject({ kind: 'docx', reason: 'no-recipe' });
+    const dir = join(importFailuresRoot(), householdId, String(warned?.failureId));
+    expect(readFileSync(join(dir, 'text.txt'), 'utf8')).toContain('repaint the shed');
+    expect(JSON.stringify(lines())).not.toContain('shed');
   });
 
   it('refuses an upload over the size cap at the input, before decoding it', async () => {

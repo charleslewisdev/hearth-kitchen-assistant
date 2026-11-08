@@ -276,12 +276,20 @@ describe('files that are not a Word document Hearth can read', () => {
     const huge = new Uint8Array(2 * MAX_DOCX_INFLATED_BYTES).fill(0x20);
     const bytes = zipSync({ 'word/document.xml': huge }, { level: 9 });
     expect(bytes.byteLength).toBeLessThan(MAX_DOCX_BYTES);
-    const heapBefore = process.memoryUsage().heapUsed;
     const started = performance.now();
     expect(draftFromDocx(bytes)).toEqual({ ok: false, reason: 'too-large' });
-    expect(performance.now() - started).toBeLessThan(2000);
-    // Bounded by the budget, not by what the entry would have inflated to.
-    expect(process.memoryUsage().heapUsed - heapBefore).toBeLessThan(3 * MAX_DOCX_INFLATED_BYTES);
+    // Generous for a busy machine: inflating all 64MiB and then refusing it would still pass a
+    // time check, which is why the half-budget test below is the one that pins the early stop.
+    expect(performance.now() - started).toBeLessThan(5000);
+  });
+
+  it('stops inflating at the budget rather than after the entry', () => {
+    // Exactly the budget, then one byte more, in the one entry: the first is read, the second is
+    // refused, so the count is taken as the bytes come out and not from the header's claim.
+    const at = (n: number) =>
+      zipSync({ 'word/document.xml': strToU8(documentXml(p('x')).padEnd(n, ' ')) }, { level: 9 });
+    expect(textFromDocx(at(MAX_DOCX_INFLATED_BYTES))).toEqual({ text: 'x' });
+    expect(textFromDocx(at(MAX_DOCX_INFLATED_BYTES + 1))).toEqual({ reason: 'too-large' });
   });
 
   it('counts the budget across parts, so many small bombs are one big one', () => {
@@ -333,9 +341,107 @@ describe('files that are not a Word document Hearth can read', () => {
     ['encrypted', (v: DataView, c: number) => v.setUint16(c + 8, 1, true)],
     ['compressed some other way', (v: DataView, c: number) => v.setUint16(c + 10, 12, true)],
     ['pointing past the end', (v: DataView, c: number) => v.setUint32(c + 20, 0x7fffffff, true)],
-    ['ZIP64', (v: DataView, c: number) => v.setUint32(v.byteLength - 6, 0xffffffff, true) ?? c],
   ])('calls an entry that is %s malformed', (_, edit) => {
     expect(draftFromDocx(editedZip(edit))).toEqual({ ok: false, reason: 'malformed' });
+  });
+});
+
+describe('the zip around the document', () => {
+  const PLAIN = documentXml(p('Plain'));
+
+  it('reads an entry that was stored rather than compressed', () => {
+    const bytes = zipSync({ 'word/document.xml': strToU8(PLAIN) }, { level: 0 });
+    expect(textFromDocx(bytes)).toEqual({ text: 'Plain' });
+  });
+
+  it('finds the directory past a comment at the end of the zip', () => {
+    const bytes = zipSync({ 'word/document.xml': strToU8(PLAIN) });
+    const comment = strToU8('saved by a test');
+    const withComment = new Uint8Array(bytes.length + comment.length);
+    withComment.set(bytes);
+    withComment.set(comment, bytes.length);
+    new DataView(withComment.buffer).setUint16(bytes.length - 2, comment.length, true);
+    expect(textFromDocx(withComment)).toEqual({ text: 'Plain' });
+  });
+
+  it('reads the first of two entries with one name', () => {
+    const bytes = zipSync({
+      'word/document.xml': strToU8(PLAIN),
+      'word/documenX.xml': strToU8(documentXml(p('Smuggled'))),
+    });
+    // Rename the second entry to the first's name, in its local and central headers both.
+    const from = strToU8('word/documenX.xml');
+    for (let i = 0; i + from.length <= bytes.length; i++) {
+      if (from.every((b, k) => bytes[i + k] === b)) bytes[i + 16] = 0x74; // 'X' -> 't'
+    }
+    expect(textFromDocx(bytes)).toEqual({ text: 'Plain' });
+  });
+
+  it.each([
+    ['entry count', 10, 0xffff, 2],
+    ['directory size', 12, 0xffffffff, 4],
+    ['directory offset', 16, 0xffffffff, 4],
+  ])('refuses a ZIP64 marker in the %s', (_, field, marker, width) => {
+    const bytes = zipSync({ 'word/document.xml': strToU8(PLAIN) });
+    const view = new DataView(bytes.buffer);
+    const end = bytes.length - 22;
+    if (width === 2) view.setUint16(end + field, marker, true);
+    else view.setUint32(end + field, marker, true);
+    expect(textFromDocx(bytes)).toEqual({ reason: 'malformed' });
+  });
+});
+
+describe('lists that are not what Word writes', () => {
+  /** numbering.xml with one decimal level at `ilvl`, as list 1. */
+  const numbering = (ilvl: string, start = '1') =>
+    `<w:numbering xmlns:w="${W}"><w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="${ilvl}"><w:start w:val="${start}"/><w:numFmt w:val="decimal"/></w:lvl></w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num></w:numbering>`;
+  const item = (ilvl: string) =>
+    p('Stir', `<w:numPr><w:ilvl w:val="${ilvl}"/><w:numId w:val="1"/></w:numPr>`);
+
+  it.each(['-5', '4294967295', '1.5', 'x'])(
+    'reads a list level of %s as no level at all',
+    (ilvl) => {
+      expect(text(item(ilvl), { 'word/numbering.xml': numbering(ilvl) })).toBe('• Stir');
+    },
+  );
+
+  it('numbers from 0 when a list says to', () => {
+    expect(text(item('0'), { 'word/numbering.xml': numbering('0', '0') })).toBe('0. Stir');
+  });
+
+  it('resolves only the levels paragraphs use, so thousands of lists cost nothing', () => {
+    // 8,000 levels in one abstract list and 8,000 lists over it. Expanded up front, 5,000 of each
+    // (a 25KB upload) blocked the server for 1.9s and 10,000 ran it out of memory.
+    const n = 8000;
+    let xml = `<w:numbering xmlns:w="${W}"><w:abstractNum w:abstractNumId="0">`;
+    for (let i = 0; i < n; i++) xml += `<w:lvl w:ilvl="${i}"><w:numFmt w:val="decimal"/></w:lvl>`;
+    xml += '</w:abstractNum>';
+    for (let i = 0; i < n; i++) xml += `<w:num w:numId="${i}"><w:abstractNumId w:val="0"/></w:num>`;
+    xml += '</w:numbering>';
+    const started = performance.now();
+    expect(text(item('0'), { 'word/numbering.xml': xml })).toBe('1. Stir');
+    expect(performance.now() - started).toBeLessThan(2000);
+  });
+
+  it('reads a tracked change to a paragraph as the paragraph is now, not as it was', () => {
+    const wasNumbered = p(
+      'Plain line',
+      '<w:pPrChange w:id="1" w:author="A"><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr></w:pPrChange>',
+    );
+    const nowNumbered = p(
+      'Step one',
+      '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr><w:pPrChange w:id="2" w:author="A"><w:pPr><w:pStyle w:val="Normal"/><w:numPr><w:numId w:val="0"/></w:numPr></w:pPr></w:pPrChange>',
+    );
+    expect(text(wasNumbered + nowNumbered)).toBe('Plain line\n1. Step one');
+
+    const styles = `<w:styles xmlns:w="${W}"><w:style w:type="paragraph" w:styleId="Was"><w:pPr><w:pPrChange w:id="3"><w:pPr><w:numPr><w:numId w:val="1"/></w:numPr></w:pPr></w:pPrChange></w:pPr></w:style></w:styles>`;
+    expect(text(p('Styled', '<w:pStyle w:val="Was"/>'), { 'word/styles.xml': styles })).toBe(
+      'Styled',
+    );
+  });
+
+  it('leaves an entity name that only an object prototype knows as it was written', () => {
+    expect(text(p('a &toString; b &__proto__; c'))).toBe('a &toString; b &__proto__; c');
   });
 });
 
@@ -351,23 +457,31 @@ describe('hostile documents finish in linear time', () => {
   const HUGE = 4_000_000;
 
   it.each([
-    ['unclosed tags', '<'.repeat(HUGE)],
-    ['an open quote in a tag', `<w:document a="${'x'.repeat(HUGE)}`],
+    ['unclosed tags', '<'.repeat(HUGE), 'malformed'],
+    ['an open quote in a tag', `<w:document a="${'x'.repeat(HUGE)}`, 'malformed'],
     [
       'ampersands with no semicolon',
       `<w:document><w:body><w:p><w:r><w:t>${'&'.repeat(HUGE)}</w:t></w:r></w:p></w:body></w:document>`,
+      'too-much-content',
     ],
     [
       'ampersands far from a semicolon',
       `<w:document><w:body><w:p><w:r><w:t>${'&#1'.repeat(HUGE / 3)};</w:t></w:r></w:p></w:body></w:document>`,
+      'too-much-content',
     ],
-    ['nesting past the depth cap', '<a>'.repeat(HUGE / 3)],
-    ['a long run of equals signs in a tag', `<w:document ${'='.repeat(HUGE)}>`],
-    ['many empty paragraphs', documentXml('<w:p/>'.repeat(HUGE / 6))],
-    ['a run of tabs', documentXml(`<w:p><w:r>${'<w:tab/>'.repeat(HUGE / 8)}</w:r></w:p>`)],
-  ])('%s', (_, xml) => {
+    // Closed again, so only the depth cap can refuse it.
+    ['nesting past the depth cap', '<a>'.repeat(HUGE / 7) + '</a>'.repeat(HUGE / 7), 'malformed'],
+    ['a long run of equals signs in a tag', `<w:document ${'='.repeat(HUGE)}>`, 'malformed'],
+    ['many empty paragraphs', documentXml('<w:p/>'.repeat(HUGE / 6)), 'too-much-content'],
+    [
+      'a run of tabs',
+      documentXml(`<w:p><w:r>${'<w:tab/>'.repeat(HUGE / 8)}</w:r></w:p>`),
+      'too-much-content',
+    ],
+  ])('%s', (_, xml, reason) => {
     const { result, ms } = timed(xml);
-    expect(result.ok).toBe(false);
-    expect(ms).toBeLessThan(2000);
+    expect(result).toMatchObject({ ok: false, reason });
+    // Generous for a busy machine; the quadratic entity search this caught took 58 seconds.
+    expect(ms).toBeLessThan(5000);
   });
 });

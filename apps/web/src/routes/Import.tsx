@@ -44,7 +44,7 @@ type OpenField = 'link' | 'text' | null;
  */
 const TOO_LARGE = {
   pdf: 'That PDF is too large to import. Try saving just the recipe pages.',
-  docx: 'That document is too large to import. Try saving just the recipe in a new one.',
+  docx: 'That document is too large to import. Copy just the recipe into a new document.',
   image: 'That photo is too large to import. Take it again at a smaller size.',
 } as const;
 
