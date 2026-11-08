@@ -40,6 +40,10 @@ Two lines are added together only when **all** of these are true:
 
 Adding the same recipe twice doubles its amounts.
 
+An amount you change by hand (see [At the store](#at-the-store)) becomes the item's amount, and
+recipes added later add to it. If you change an item's unit to one another recipe item of the same
+food already has, the two become one line with the amounts added together.
+
 ### Adding staples by hand
 
 Type into the box at the top, for example `2 dozen eggs` or `paper towels`, and press **Add**.
@@ -71,12 +75,18 @@ yet.
 
 - **Tick an item** to check it off. It moves to the **Done** section at the bottom. Tick it again
   to put it back.
+- **Tap an amount** to change it, for example from `6` to `1 dozen`, or from `3 cloves` to
+  `1 head`. Type an amount and a unit only, then press **Save** or Enter. Leave the box empty for
+  no amount. An item with no amount shows **Add amount** instead.
 - **×** removes one item from the list.
 - **Clear checked** removes every checked item, for everyone in the household.
 
 Changes are saved on the server straight away, so every device in the household sees the same
 list. A phone with the list open picks up other people's changes within about 5 seconds, so two of
 you can shop from the same list at once.
+
+If someone else changes an amount, or adds a recipe onto it, while you are changing it, Hearth
+keeps their change and tells you yours was not saved, so neither of you loses an edit unseen.
 
 With no signal (a store with patchy reception), ticks, removals and new items still show at once,
 a note says you're offline, and they are sent when the phone reconnects. Keep Hearth open while
