@@ -123,6 +123,9 @@ importers:
       better-auth:
         specifier: ^1.2.0
         version: 1.6.19(drizzle-kit@0.28.1)(drizzle-orm@0.36.4(@types/pg@8.20.0)(@types/react@18.3.31)(kysely@0.29.2)(pg@8.22.0)(react@18.3.1))(pg@8.22.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(vitest@2.1.9(@types/node@26.0.0)(jsdom@25.0.1(canvas@2.11.2))(terser@5.48.0))
+      fflate:
+        specifier: ^0.8.3
+        version: 0.8.3
       react:
         specifier: ^18.3.0
         version: 18.3.1
