@@ -32,6 +32,15 @@ function unlinkLine(text: string, linkTitle: string): string {
   return text === '' ? linkTitle : `${text} ${linkTitle}`;
 }
 
+/**
+ * An ingredient line with its `[[Title]]` link written back as plain words, as `planImport` does
+ * for a link that cannot resolve. A line without a link comes back as it is.
+ */
+export function unlinkRecipeLine(line: string): string {
+  const { text, linkTitle } = splitRecipeLink(line);
+  return linkTitle === null ? line : unlinkLine(text, linkTitle);
+}
+
 export function planImport<T>(
   items: readonly T[],
   read: (item: T) => { title: string; ingredientLines: string[] },

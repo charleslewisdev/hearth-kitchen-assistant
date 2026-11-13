@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planImport } from './import-order';
+import { planImport, unlinkRecipeLine } from './import-order';
 import { recipeTitleKey } from './recipe-link';
 
 interface Item {
@@ -103,5 +103,16 @@ describe('planImport', () => {
     expect(p.create).toHaveLength(n);
     expect(p.create[0]?.item.title).toBe(`R${n - 1}`);
     expect(p.create[n - 1]?.item.title).toBe('R0');
+  });
+});
+
+describe('unlinkRecipeLine', () => {
+  it('writes the link back as the linked title in plain words', () => {
+    expect(unlinkRecipeLine('1 [[Pizza Dough]]')).toBe('1 Pizza Dough');
+    expect(unlinkRecipeLine('[[Pizza Dough]]')).toBe('Pizza Dough');
+  });
+
+  it('leaves a line without a link as it is', () => {
+    expect(unlinkRecipeLine('200 g mozzarella')).toBe('200 g mozzarella');
   });
 });
