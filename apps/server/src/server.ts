@@ -36,7 +36,7 @@ import { deleteSetupToken, ensureSetupToken, setupTokenPath } from './setup-toke
 import { appRouter } from './trpc/routers';
 import { createContext } from './trpc/context';
 import { findRecipeFile } from './repo/recipe-files';
-import { readFileVariant } from './files';
+import { fileVariantExists, readFileVariant } from './files';
 import { exportRecipes, type ExportedRecipe } from './repo/recipe-export';
 import { strToU8, Zip, ZipDeflate, ZipPassThrough } from 'fflate';
 import { PassThrough } from 'node:stream';
@@ -643,14 +643,16 @@ if (env.NODE_ENV !== 'test' && process.argv[1]?.endsWith('server.ts')) {
 /**
  * Write the library zip into `out`, one entry strictly after another: a recipe's Markdown
  * (deflated), then each of its files stored as they are, since JPEG and PDF do not compress.
- * Only one file is read at a time and a chunk waits for `out` to drain before the next, so
+ * Only one file is open at a time (each is opened when its entry is written, so no stream sits
+ * unattended with nobody listening for its errors) and a chunk waits for `out` to drain before the next, so
  * memory stays near one read buffer however big the library is.
  *
  * Paths sit under the recipe's Markdown stem: `<stem>/photo-<n>.jpg`, `<stem>/page-<n>.jpg`,
  * `<stem>/source.pdf` (a second PDF is `source-2.pdf`), numbered over the files actually found.
  * A file row whose bytes are missing is left out of the zip and the front matter, with a warning
- * that names its id: a partial backup beats a failed one. A read that fails mid-stream ends the
- * download with an error, since the headers are already gone. Ids only in every log line (D38).
+ * that names its id: a partial backup beats a failed one. A file that cannot be opened or read
+ * when its turn comes ends the download with an error, since the headers are already gone and it
+ * is already listed in the Markdown. Ids only in every log line (D38).
  */
 async function streamRecipeZip(
   out: PassThrough,
@@ -690,7 +692,7 @@ async function streamRecipeZip(
     const name = recipeMarkdownFileName(exported.title, used);
     const stem = name.slice(0, -'.md'.length);
     const counts = { photo: 0, source_page: 0, source_pdf: 0 };
-    const present: { id: string; path: string; stream: ReadStream }[] = [];
+    const present: { id: string; path: string }[] = [];
     const files: MarkdownRecipeFiles = {
       photos: [],
       cover: null,
@@ -698,8 +700,7 @@ async function streamRecipeZip(
       sourcePdf: null,
     };
     for (const file of exported.files) {
-      const stream = readFileVariant(householdId, file.id, 'full');
-      if (!stream) {
+      if (!fileVariantExists(householdId, file.id, 'full')) {
         log.warn({ fileId: file.id }, 'export: file missing on disk');
         continue;
       }
@@ -717,7 +718,7 @@ async function streamRecipeZip(
         // The front matter has room for one PDF; a second still travels in the folder.
         files.sourcePdf ??= path;
       }
-      present.push({ id: file.id, path, stream });
+      present.push({ id: file.id, path });
     }
 
     const markdown =
@@ -729,23 +730,26 @@ async function streamRecipeZip(
 
     for (const file of present) {
       if (out.destroyed) break;
-      const entry = new ZipPassThrough(`${folder}/${file.path}`);
-      zip.add(entry);
+      let stream: ReadStream | null = null;
       try {
-        for await (const chunk of file.stream) {
+        stream = readFileVariant(householdId, file.id, 'full');
+        if (!stream) throw new Error('file vanished');
+        const entry = new ZipPassThrough(`${folder}/${file.path}`);
+        zip.add(entry);
+        for await (const chunk of stream) {
           entry.push(chunk as Buffer, false);
           await drained();
           if (out.destroyed) break;
         }
+        entry.push(new Uint8Array(0), true);
       } catch {
         log.error({ fileId: file.id }, 'export: file read failed');
         out.destroy(new Error('export: file read failed'));
         break;
+      } finally {
+        stream?.destroy();
       }
-      entry.push(new Uint8Array(0), true);
     }
-    // Every stream is spent by now unless the download stopped early.
-    for (const file of present) file.stream.destroy();
   }
   if (!out.destroyed) zip.end();
 }

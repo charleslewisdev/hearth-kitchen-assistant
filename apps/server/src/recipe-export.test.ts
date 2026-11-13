@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { unzipSync, strFromU8 } from 'fflate';
-import { rm } from 'node:fs/promises';
+import { chmod, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
 // Building a session sends a verification mail; keep it in memory.
@@ -314,6 +314,56 @@ describe('the export downloads', () => {
     expect(warns).toHaveLength(1);
     expect(JSON.stringify(warns[0])).toContain(gone.id);
     expect(JSON.stringify(lines())).not.toContain('Secret');
+  });
+
+  it('survives a file that cannot be opened when its turn comes, and ends that download', async () => {
+    const owner = await ownerWithHousehold();
+    const cookie = owner.headers.get('cookie') ?? '';
+    const { caller } = await callerIn(owner.householdId);
+    const { id: stewId } = await caller.recipe.create({ title: 'Secret Stew' });
+    const bytes = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(300_000, 7)]);
+    const add = () =>
+      addRecipeFile(owner.householdId, owner.userId, {
+        recipeId: stewId,
+        kind: 'photo',
+        full: bytes,
+        thumb: bytes,
+      });
+    await add();
+    const locked = await add();
+    // It exists, so it is listed, but opening it fails (EACCES), after the stream before it
+    // has begun to be written.
+    const path = join(filesRoot(), owner.householdId, `${locked.id}-full`);
+    await chmod(path, 0o000);
+    const before = lines().length;
+    try {
+      let ended = false;
+      try {
+        const res = await server.inject({ url: '/api/export/recipes.zip', headers: { cookie } });
+        // A truncated zip has no central directory, so reading it fails.
+        expect(() => unzipSync(new Uint8Array(res.rawPayload))).toThrow();
+        ended = true;
+      } catch {
+        ended = true;
+      }
+      expect(ended).toBe(true);
+      // Let any stray stream error surface before judging the process.
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      const errors = lines()
+        .slice(before)
+        .filter((line) => line.level === 50);
+      expect(errors).toHaveLength(1);
+      expect(JSON.stringify(errors[0])).toContain(locked.id);
+      expect(JSON.stringify(lines())).not.toContain('Secret');
+
+      await chmod(path, 0o600);
+      const again = await server.inject({ url: '/api/export/recipes.zip', headers: { cookie } });
+      expect(again.statusCode).toBe(200);
+      expect(Object.keys(unzipSync(new Uint8Array(again.rawPayload))).length).toBeGreaterThan(2);
+    } finally {
+      await chmod(path, 0o600);
+    }
   });
 
   it('sends one recipe as a Markdown file', async () => {

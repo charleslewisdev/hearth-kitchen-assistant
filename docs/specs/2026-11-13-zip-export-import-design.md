@@ -46,13 +46,13 @@ source_pdf: 'green-chile-stew/source.pdf'
 All of it happens in the browser, through the procedures that already exist. Files go up one at a time through `recipeFile.upload`, under its current limits. The server gains no upload route, no body-limit change and no image library.
 
 1. **Pick.** The Import screen's Markdown tile also accepts `.zip`.
-2. **Read (pass 1).** The browser streams the zip with fflate's `Unzip` from `File.stream()`. It keeps only `.md` entries, each capped at `MAX_TEXT_LENGTH` characters; larger entries are skipped and listed. Every other entry is skipped without being decompressed. Each `.md` goes through `readRecipeMarkdown`. A file without front matter is listed as "not a Hearth recipe" and skipped.
+2. **Read (pass 1).** The browser lists the zip's entries from its central directory and reads each wanted entry by `Blob.slice`, checking its size and CRC-32. It keeps only `.md` entries, each capped at `MAX_TEXT_LENGTH` characters; larger entries are skipped and listed. Every other entry is skipped without being decompressed. Each `.md` goes through `readRecipeMarkdown`. A file without front matter is listed as "not a Hearth recipe" and skipped.
 3. **Summary.** Before anything is saved, the screen shows: "42 recipes, 51 photos and scans. 3 are already in your library and will be skipped: …". A title counts as present when `recipeTitleKey` matches a title in `recipe.list` or an earlier recipe in the same zip. One button: **Import 39 recipes**.
 4. **Save recipes.** Recipes go through `recipe.create`, one at a time, so that every recipe they link is created before them.
    - The order comes from each recipe's `[[Title]]` tokens: within the zip, depth first.
    - A link whose title is neither in the library nor in the zip, or that is part of a cycle, is written back as plain text, so `[[Pizza Dough]]` becomes `Pizza Dough`. The summary lists those recipes. `recipe.create` would otherwise refuse the whole recipe.
    - `rating` is carried, as the Markdown tile does today.
-5. **Save files (pass 2).** The zip is streamed again. Each listed file of a saved recipe is uploaded with `recipeFile.upload`:
+5. **Save files (pass 2).** The zip is read again the same way. Each listed file of a saved recipe is uploaded with `recipeFile.upload`:
    - Photos are re-encoded by `prepareImage` and source pages by `prepareSourcePage` (both in `photo-upload.ts`), which make the thumbnail.
    - The PDF goes up as it is. An entry larger than the kind's cap is skipped and listed, without being decompressed past the cap.
    - When the recipe's files are in, `cover` is set with `recipeFile.setCover`, unless it is already the first photo.
