@@ -1,8 +1,12 @@
-import { and, eq, ne, isNull, isNotNull, asc, sql } from 'drizzle-orm';
+import { and, eq, ne, inArray, isNull, isNotNull, asc, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import {
   scale,
   itemMergeKey,
+  mergeUnit,
+  unitFactor,
+  unitFamily,
+  unitsInFamily,
   isNeverBought,
   parseIngredientLine,
   quantityToBuy,
@@ -325,6 +329,7 @@ export async function addRecipeToListTx(
       ) {
         continue;
       }
+      if (await mergeInFamily(tx, householdId, list.id, candidate)) continue;
     }
 
     await tx.insert(shoppingListItem).values({
@@ -342,6 +347,61 @@ export async function addRecipeToListTx(
       position: position++,
     });
   }
+}
+
+// Merge a candidate into an unchecked recipe item of the same food whose unit is in the same
+// family (#17, D13): "4 tbsp flour" and "1 cup flour" become "1.25 cup flour". The item is kept in
+// `mergeUnit`'s choice, so its own amount is converted too, in the same statement and only while
+// it still has the unit it was read with. Volume never meets weight, and a count unit has no
+// family, so those stay separate rows. Returns whether it merged.
+async function mergeInFamily(
+  tx: Tx,
+  householdId: string,
+  listId: string,
+  candidate: Candidate,
+): Promise<boolean> {
+  const family = unitFamily(candidate.unit);
+  if (family === null || candidate.foodId === null || candidate.quantity === null) return false;
+  const [existing] = await tx
+    .select({ id: shoppingListItem.id, unit: shoppingListItem.unit })
+    .from(shoppingListItem)
+    .where(
+      and(
+        eq(shoppingListItem.householdId, householdId),
+        eq(shoppingListItem.listId, listId),
+        eq(shoppingListItem.source, 'recipe'),
+        eq(shoppingListItem.checked, false),
+        eq(shoppingListItem.foodId, candidate.foodId),
+        inArray(shoppingListItem.unit, unitsInFamily(family)),
+        isNotNull(shoppingListItem.quantity),
+      ),
+    )
+    .orderBy(asc(shoppingListItem.position))
+    .limit(1);
+  if (!existing?.unit) return false;
+
+  const target = mergeUnit(existing.unit, candidate.unit!);
+  const existingFactor = target === null ? null : unitFactor(existing.unit, target);
+  const adding = target === null ? null : unitFactor(candidate.unit!, target);
+  if (target === null || existingFactor === null || adding === null) return false;
+
+  const updated = await tx
+    .update(shoppingListItem)
+    .set({
+      quantity: sql`round(${shoppingListItem.quantity} * ${String(existingFactor)}::numeric + ${String(candidate.quantity * adding)}::numeric, 3)`,
+      unit: target,
+    })
+    .where(
+      and(
+        eq(shoppingListItem.householdId, householdId),
+        eq(shoppingListItem.id, existing.id),
+        eq(shoppingListItem.checked, false),
+        eq(shoppingListItem.unit, existing.unit),
+        isNotNull(shoppingListItem.quantity),
+      ),
+    )
+    .returning({ id: shoppingListItem.id });
+  return updated.length > 0;
 }
 
 // Add `quantity` to an item's amount in one statement, re-rounded to 3 dp the way `scale()`
