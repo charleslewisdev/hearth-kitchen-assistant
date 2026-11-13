@@ -409,8 +409,8 @@ export function Household() {
           Export all recipes
         </a>
         <p className={styles.hint}>
-          A zip with one Markdown file per recipe. Any Hearth can take one back in, under Add a
-          recipe, then Markdown. Photos are not included.
+          A zip with one Markdown file per recipe, plus its photos and scans. Any Hearth can take
+          the whole zip back in, under Add a recipe, then Markdown: choose the zip.
         </p>
       </div>
 

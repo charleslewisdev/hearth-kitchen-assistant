@@ -47,6 +47,16 @@ export async function writeFileVariant(
   await rename(temporary, target);
 }
 
+/** Whether one variant is on disk, without opening it. */
+export function fileVariantExists(
+  householdId: string,
+  id: string,
+  variant: FileVariant,
+  dataDir?: string,
+): boolean {
+  return existsSync(pathFor(householdId, id, variant, dataDir));
+}
+
 /** A stream of one variant, or null when it is not on disk. */
 export function readFileVariant(
   householdId: string,

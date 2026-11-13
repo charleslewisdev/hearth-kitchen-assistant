@@ -12,6 +12,7 @@ import { OLD_WORD_DOCUMENT_MESSAGE } from '@hearth/server/src/messages';
 import { trpc } from '../lib/trpc';
 import { downscaleForOcr, toBase64 } from '../lib/image-upload';
 import { ImportReview, type SourceFiles } from './ImportReview';
+import { ZipImport } from './ZipImport';
 import styles from './Import.module.css';
 import { useDocumentTitle } from '../lib/useDocumentTitle';
 
@@ -92,6 +93,15 @@ interface ChosenPage {
 
 let nextPageId = 0;
 
+/** A recipe zip (issue #37), which the Markdown tile also takes, by name or media type. */
+export function isZip(file: File): boolean {
+  return (
+    file.name.toLowerCase().endsWith('.zip') ||
+    file.type === 'application/zip' ||
+    file.type === 'application/x-zip-compressed'
+  );
+}
+
 /** A file's text, as UTF-8. FileReader, as `toBase64` uses, rather than `Blob.text()`. */
 function readText(file: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -134,6 +144,8 @@ export function Import() {
   const [pages, setPages] = useState<ChosenPage[] | null>(null);
   /** What a photo or PDF import was read from, kept with the recipe once it is saved. */
   const [sourceFiles, setSourceFiles] = useState<SourceFiles | null>(null);
+  /** A recipe zip being imported, which has a screen of its own in place of this one. */
+  const [zipFile, setZipFile] = useState<File | null>(null);
 
   const fromUrl = trpc.import.fromUrl.useMutation();
   const fromText = trpc.import.fromText.useMutation();
@@ -215,6 +227,10 @@ export function Import() {
   async function importMarkdown(file: File | undefined) {
     if (!file) return;
     forget();
+    if (isZip(file)) {
+      setZipFile(file);
+      return;
+    }
     setReading(true);
     try {
       const contents = await readText(file);
@@ -309,6 +325,8 @@ export function Import() {
       setReading(false);
     }
   }
+
+  if (zipFile) return <ZipImport file={zipFile} onCancel={() => setZipFile(null)} />;
 
   if (draft) {
     // Only a file import has anything to keep: a link is its own source, and pasted text is
@@ -467,11 +485,11 @@ export function Import() {
           <li>
             <label className={styles.tile}>
               <span className={styles.tileLabel}>Markdown</span>
-              <span className={styles.tileHint}>A recipe exported from Hearth</span>
+              <span className={styles.tileHint}>A recipe or a zip exported from Hearth</span>
               <input
                 type="file"
                 className={styles.fileInput}
-                accept=".md,.markdown,text/markdown,text/plain"
+                accept=".md,.markdown,text/markdown,text/plain,.zip,application/zip"
                 disabled={busy}
                 onChange={(e) => {
                   void importMarkdown(e.target.files?.[0]);

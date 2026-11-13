@@ -31,6 +31,11 @@ vi.mock('../lib/trpc', () => ({
   },
 }));
 
+// The zip flow has its own tests; here it only matters that a zip is handed to it.
+vi.mock('./ZipImport', () => ({
+  ZipImport: ({ file }: { file: File }) => <p>Zip import of {file.name}</p>,
+}));
+
 const navigate = vi.fn();
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
@@ -256,10 +261,22 @@ describe('importing a file', () => {
     renderImport();
     const input = screen.getByLabelText(/markdown/i);
     expect(input).toHaveAttribute('type', 'file');
-    expect(input).toHaveAttribute('accept', '.md,.markdown,text/markdown,text/plain');
+    expect(input).toHaveAttribute(
+      'accept',
+      '.md,.markdown,text/markdown,text/plain,.zip,application/zip',
+    );
     const md = '---\ntitle: "Barley Pilaf"\n---\n## Ingredients\n- 1 cup barley\n';
     fireEvent.change(input, { target: { files: [new File([md], 'barley-pilaf.md')] } });
     await waitFor(() => expect(mutate.fromText).toHaveBeenCalledWith({ text: md }));
+  });
+
+  it('hands a zip chosen in the Markdown tile to the zip import, without reading it as text', async () => {
+    renderImport();
+    fireEvent.change(screen.getByLabelText(/markdown/i), {
+      target: { files: [new File([new Uint8Array([80, 75, 3, 4])], 'hearth-recipes.zip')] },
+    });
+    expect(await screen.findByText('Zip import of hearth-recipes.zip')).toBeInTheDocument();
+    expect(mutate.fromText).not.toHaveBeenCalled();
   });
 
   it('refuses a Markdown file longer than a paste may be, and an empty one', async () => {
