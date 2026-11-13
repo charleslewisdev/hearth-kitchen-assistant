@@ -319,6 +319,64 @@ describe('parseRecipeMarkdown', () => {
   });
 });
 
+describe('files in the front matter', () => {
+  const files = {
+    photos: ['a/photo-1.jpg', 'a/photo-2.jpg'],
+    cover: 'a/photo-2.jpg',
+    sourcePages: ['a/page-1.jpg'],
+    sourcePdf: 'a/source.pdf',
+  };
+  const withFiles: MarkdownRecipe = { ...rich, files };
+  const front = (lines: string[]) => `---\ntitle: "T"\n${lines.join('\n')}\n---\n`;
+
+  it('writes photos, cover, source_pages and source_pdf only when present', () => {
+    const md = recipeToMarkdown(withFiles);
+    expect(md).toContain(
+      [
+        'source_url: "https://example.com/recipes/fennel-toast?x=1&y=2"',
+        'photos: ["a/photo-1.jpg", "a/photo-2.jpg"]',
+        'cover: "a/photo-2.jpg"',
+        'source_pages: ["a/page-1.jpg"]',
+        'source_pdf: "a/source.pdf"',
+        '---',
+      ].join('\n'),
+    );
+    expect(recipeToMarkdown(rich)).not.toMatch(/photos|cover|source_pages|source_pdf/);
+    const empty = { photos: [], cover: null, sourcePages: [], sourcePdf: null };
+    expect(recipeToMarkdown({ ...rich, files: empty })).toBe(recipeToMarkdown(rich));
+  });
+
+  it('round-trips files', () => {
+    expect(parseRecipeMarkdown(recipeToMarkdown(withFiles))).toEqual(withFiles);
+    expect(parseRecipeMarkdown(recipeToMarkdown(rich))).toEqual(rich);
+  });
+
+  it('drops unsafe paths', () => {
+    const long = 'a'.repeat(201);
+    const md = front([
+      `photos: ["/etc/x.jpg", "../x.jpg", "a/../x.jpg", "a\\\\b.jpg", "a//b.jpg", "./x.jpg", "${long}", "ok/1.jpg"]`,
+      'cover: "/etc/x.jpg"',
+      'source_pdf: "../s.pdf"',
+    ]);
+    expect(parseRecipeMarkdown(md)?.files).toEqual({
+      photos: ['ok/1.jpg'],
+      cover: null,
+      sourcePages: [],
+      sourcePdf: null,
+    });
+    expect(
+      parseRecipeMarkdown(front(['photos: ["/x.jpg"]', 'source_pages: ["..\\\\y"]'])),
+    ).not.toHaveProperty('files');
+  });
+
+  it('cover must be one of the photos', () => {
+    const md = front(['photos: ["a/1.jpg"]', 'cover: "a/2.jpg"']);
+    expect(parseRecipeMarkdown(md)?.files?.cover).toBeNull();
+    expect(parseRecipeMarkdown(md)?.files?.photos).toEqual(['a/1.jpg']);
+    expect(parseRecipeMarkdown(front(['cover: "a/1.jpg"']))).not.toHaveProperty('files');
+  });
+});
+
 describe('recipeMarkdownFileName', () => {
   it('names a file after the recipe, and never twice in one export', () => {
     const used = new Set<string>();

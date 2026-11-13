@@ -5,7 +5,8 @@ import { slugify } from './slug';
  * A recipe as a Markdown file, for export and for importing it back (D52).
  *
  * Front matter carries the fields a person would not want to hunt for in prose (title, servings
- * and the high end of a servings range, times, types, tags, rating, source), and the body
+ * and the high end of a servings range, times, types, tags, rating, source, and the paths of
+ * its photos, cover and scans inside an export's zip), and the body
  * carries the recipe as anyone would write it: `## Ingredients` as a list, `## Method` as a
  * numbered list, `## Notes` as text. Human-readable first, and deterministic: `parseRecipeMarkdown(recipeToMarkdown(r))` is `r` again.
  *
@@ -21,6 +22,15 @@ import { slugify } from './slug';
  * Everything here is read from untrusted text. It is line by line, with no regex that can
  * backtrack across a line, and the front matter is capped (`MAX_FRONT_MATTER`).
  */
+
+/** Paths, relative to the zip an export is, of a recipe's photos and scans. */
+export interface MarkdownRecipeFiles {
+  photos: string[];
+  /** One of `photos`. */
+  cover: string | null;
+  sourcePages: string[];
+  sourcePdf: string | null;
+}
 
 /** The fields a Markdown recipe carries: what `recipe.create` takes, plus the rating. */
 export interface MarkdownRecipe {
@@ -40,6 +50,8 @@ export interface MarkdownRecipe {
   /** Each line as written, with a linked recipe as a `[[Title]]` token. */
   ingredientLines: string[];
   steps: string[];
+  /** Present only when the file names photos or scans. */
+  files?: MarkdownRecipeFiles;
 }
 
 /** Written into every export, so a later format can tell an old file from a new one. */
@@ -53,6 +65,21 @@ const MAX_MINUTES = 10_000;
 
 /** The same bound `recipe.create` and `recipe.update` put on the high end of a servings range. */
 const MAX_SERVINGS_HIGH = 10_000;
+
+/** The longest path a file may name. */
+const MAX_PATH_LENGTH = 200;
+
+/**
+ * The path when it is safe to read from a zip: non-empty, at most 200 characters, relative, with
+ * no backslash and no empty, `.` or `..` segment. String splitting only, no regex.
+ */
+export function safeZipPath(p: string): string | null {
+  if (p === '' || p.length > MAX_PATH_LENGTH || p.startsWith('/') || p.includes('\\')) return null;
+  for (const segment of p.split('/')) {
+    if (segment === '' || segment === '.' || segment === '..') return null;
+  }
+  return p;
+}
 
 const quote = (value: string) => JSON.stringify(value);
 const list = (values: readonly string[]) => `[${values.map(quote).join(', ')}]`;
@@ -92,6 +119,13 @@ export function recipeToMarkdown(recipe: MarkdownRecipe): string {
   if (recipe.rating !== null) front.push(`rating: ${recipe.rating}`);
   if (recipe.sourceName !== null) front.push(`source_name: ${quote(recipe.sourceName)}`);
   if (recipe.sourceUrl !== null) front.push(`source_url: ${quote(recipe.sourceUrl)}`);
+  const files = recipe.files;
+  if (files) {
+    if (files.photos.length > 0) front.push(`photos: ${list(files.photos)}`);
+    if (files.cover !== null) front.push(`cover: ${quote(files.cover)}`);
+    if (files.sourcePages.length > 0) front.push(`source_pages: ${list(files.sourcePages)}`);
+    if (files.sourcePdf !== null) front.push(`source_pdf: ${quote(files.sourcePdf)}`);
+  }
   front.push('---');
 
   const body = [
@@ -228,6 +262,10 @@ const FRONT_MATTER_KEYS = [
   'rating',
   'source_name',
   'source_url',
+  'photos',
+  'cover',
+  'source_pages',
+  'source_pdf',
 ];
 
 const RECIPE_TYPE_SET: ReadonlySet<string> = new Set(RECIPE_TYPES);
@@ -353,6 +391,21 @@ export function readRecipeMarkdown(input: string): ReadMarkdownRecipe | null {
   const types = listField(fields.get('types')).map((t) => t.toLowerCase());
   const title = stringField(fields.get('title')) ?? heading ?? '';
   const servings = integerField(fields.get('servings'), 1, 1_000_000);
+  const photos = listField(fields.get('photos'))
+    .map(safeZipPath)
+    .filter((p): p is string => p !== null);
+  const coverText = stringField(fields.get('cover'));
+  const pdfText = stringField(fields.get('source_pdf'));
+  const readFiles: MarkdownRecipeFiles = {
+    photos,
+    cover: coverText !== null && photos.includes(coverText) ? coverText : null,
+    sourcePages: listField(fields.get('source_pages'))
+      .map(safeZipPath)
+      .filter((p): p is string => p !== null),
+    sourcePdf: pdfText !== null ? safeZipPath(pdfText) : null,
+  };
+  const hasFiles =
+    readFiles.photos.length > 0 || readFiles.sourcePages.length > 0 || readFiles.sourcePdf !== null;
   const recipe: MarkdownRecipe = {
     title,
     servings: servings ?? 1,
@@ -375,6 +428,7 @@ export function readRecipeMarkdown(input: string): ReadMarkdownRecipe | null {
     description: description === '' ? null : description,
     ingredientLines,
     steps,
+    ...(hasFiles ? { files: readFiles } : {}),
   };
   return { recipe, stated: { title: title !== '', servings: servings !== null } };
 }
