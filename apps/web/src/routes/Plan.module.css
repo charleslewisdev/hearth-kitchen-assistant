@@ -216,6 +216,20 @@
   gap: 6px;
 }
 
+/* Desktop drag between slots (D58): the row picked up, and the slot it would land in. */
+.draggable {
+  cursor: grab;
+}
+
+.dragging {
+  opacity: 0.5;
+}
+
+.dropOver {
+  outline: 2px dashed var(--color-accent);
+  outline-offset: 2px;
+}
+
 .entryMain {
   display: flex;
   align-items: center;
