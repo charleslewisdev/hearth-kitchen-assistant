@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
-import { render, screen, fireEvent, cleanup, within } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, within, waitFor } from '@testing-library/react';
+import { onlineManager } from '@tanstack/react-query';
 import { NOT_A_MEMBER_MESSAGE } from '@hearth/server/src/messages';
 import { Household } from './Household';
 import { trpc } from '../lib/trpc';
 import { authClient } from '../lib/auth';
+import { queryClient } from '../lib/query-client';
 
 // Mock the typed tRPC client: the screen touches household.members + household.invitations,
 // three mutations, and useUtils for query invalidation.
@@ -294,6 +296,95 @@ describe('Household', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
 
     expect(signOut).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('signing out with changes that have not synced', () => {
+  /** A list tick made with no signal: React Query pauses it until the phone is back online. */
+  async function queueOfflineChanges(count: number) {
+    onlineManager.setOnline(false);
+    for (let i = 0; i < count; i++) {
+      void queryClient
+        .getMutationCache()
+        .build(queryClient, { mutationKey: [['shoppingList', 'toggleChecked']] })
+        .execute({ itemId: `i${i}`, checked: true })
+        .catch(() => undefined);
+    }
+    await waitFor(() =>
+      expect(
+        queryClient.getMutationCache().findAll({ predicate: (m) => m.state.isPaused }),
+      ).toHaveLength(count),
+    );
+  }
+
+  afterEach(() => {
+    queryClient.getMutationCache().clear();
+    onlineManager.setOnline(true);
+  });
+
+  it('warns first, and signs out only when asked again', async () => {
+    await queueOfflineChanges(2);
+    mockHousehold({});
+    render(<Household />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+
+    expect(signOut).not.toHaveBeenCalled();
+    expect(screen.getByRole('alertdialog')).toHaveTextContent(
+      "2 changes made without a signal haven't synced yet",
+    );
+    expect(screen.getByRole('button', { name: 'Stay signed in' })).toHaveFocus();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out anyway' }));
+    expect(signOut).toHaveBeenCalledTimes(1);
+  });
+
+  it('says one change in the singular', async () => {
+    await queueOfflineChanges(1);
+    mockHousehold({});
+    render(<Household />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+
+    expect(screen.getByRole('alertdialog')).toHaveTextContent(
+      "1 change made without a signal hasn't synced yet",
+    );
+  });
+
+  it('stays signed in on cancel and puts focus back on Sign out', async () => {
+    await queueOfflineChanges(1);
+    mockHousehold({});
+    render(<Household />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Stay signed in' }));
+
+    expect(signOut).not.toHaveBeenCalled();
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sign out' })).toHaveFocus();
+  });
+
+  it('drops the warning once the changes sync', async () => {
+    await queueOfflineChanges(1);
+    mockHousehold({});
+    render(<Household />);
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+
+    // The signal comes back and the queue is sent (QueryClientProvider resumes it in the app).
+    // The mocked client refuses it, which also takes it out of the queue.
+    onlineManager.setOnline(true);
+    void queryClient.resumePausedMutations();
+
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Sign out' })).toHaveFocus();
+
+    // A change queued later does not bring the old warning back by itself.
+    await queueOfflineChanges(1);
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+    expect(signOut).not.toHaveBeenCalled();
   });
 });
 
