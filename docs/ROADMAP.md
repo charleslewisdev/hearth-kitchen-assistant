@@ -29,10 +29,12 @@ what the parser cannot settle ([#7](https://github.com/charleslewisdev/hearth-ki
 - The shopping list prints from the Shop tab (#27).
 - Word documents (`.docx`) import through the PDF tile (#28, D55).
 - The shopping list opens with no signal, from this phone's last copy (#29, D56).
+- The list merges a food's amounts across one unit family, such as tablespoons into cups (#17, D58).
+- Offline edits from two phones reconcile by replay, under recorded rules (#11, D59).
+- Planned meals drag between days and meals on a desktop (#18, D60).
+- After a servings change on a meal already on the list, the planner offers to update the list (#12, D61).
 
-**Known gaps:** a servings change after Build shopping list does not reach the list ([#12](https://github.com/charleslewisdev/hearth-kitchen-assistant/issues/12),
-D44); offline edits on two phones have no conflict rule yet ([#11](https://github.com/charleslewisdev/hearth-kitchen-assistant/issues/11)); a page with two recipes on
-it is read as one ([#10](https://github.com/charleslewisdev/hearth-kitchen-assistant/issues/10)).
+**Known gaps:** a page with two recipes on it is read as one ([#10](https://github.com/charleslewisdev/hearth-kitchen-assistant/issues/10)).
 
 ## Phases
 
@@ -73,9 +75,10 @@ The shopping-list core (generate from recipes, free-form editing, sink-away chec
 **Exit:** a user can plan a week (day-assigned, freshness-aware) and the list reflects it.
 **Planner MVP done 2026-09-23** (private PR #11): day-assigned week planning and Build shopping list.
 **2026-11-08:** list amounts are changed in place (D54) and the list prints from the Shop tab (#27).
-Still open for P3: store layouts and more than one list ([#16](https://github.com/charleslewisdev/hearth-kitchen-assistant/issues/16)), cross-unit aggregation
-([#17](https://github.com/charleslewisdev/hearth-kitchen-assistant/issues/17)), drag and drop between slots ([#18](https://github.com/charleslewisdev/hearth-kitchen-assistant/issues/18)), and a servings change after Build reaching the
-list ([#12](https://github.com/charleslewisdev/hearth-kitchen-assistant/issues/12)). Freshness-aware sequencing is tracked with P4 ([#19](https://github.com/charleslewisdev/hearth-kitchen-assistant/issues/19)).
+**2026-11-08, later:** cross-unit aggregation within a unit family (D58), drag and drop between slots
+on a desktop (D60), and a servings change after Build reaching the list on the cook's say-so (D61).
+Still open for P3: store layouts and more than one list ([#16](https://github.com/charleslewisdev/hearth-kitchen-assistant/issues/16)), not needed while the household
+shops at one store. Freshness-aware sequencing is tracked with P4 ([#19](https://github.com/charleslewisdev/hearth-kitchen-assistant/issues/19)).
 
 ### P4 — Scaling, leftovers & freezer ⬜
 
@@ -134,7 +137,7 @@ Resolved during 2026-06-19 P0 execution:
 
 Deferred from P0:
 
-- **PWA offline-sync conflict resolution**: still open, now [#11](https://github.com/charleslewisdev/hearth-kitchen-assistant/issues/11) (first recorded as #9 in the [deferred/hardening backlog](https://github.com/charleslewisdev/hearth-kitchen-assistant/blob/670fb00a1a487f6079559506ae1da19b5c35b341/docs/plans/2026-06-19-p0-deferred-and-hardening.md)).
+- ~~**PWA offline-sync conflict resolution**~~ **Settled 2026-11-08 as D59** ([#11](https://github.com/charleslewisdev/hearth-kitchen-assistant/issues/11)) (first recorded as #9 in the [deferred/hardening backlog](https://github.com/charleslewisdev/hearth-kitchen-assistant/blob/670fb00a1a487f6079559506ae1da19b5c35b341/docs/plans/2026-06-19-p0-deferred-and-hardening.md)).
 - ~~**Public-instance readiness**~~ **Built as P0.5, 2026-09-09 (D36–D42):** email verification, auth rate limiting, first-boot secret generation and running behind a TLS-terminating proxy.
 
 Surfaced by the 2026-06-18 P0 plan stress test (details + rationale in [DECISION_LOG.md](DECISION_LOG.md#pending-decisions)) — still open, answer before the phase each gates:
