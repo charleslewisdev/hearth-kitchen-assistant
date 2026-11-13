@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { unzipSync, strFromU8 } from 'fflate';
+import { rm } from 'node:fs/promises';
+import { join } from 'node:path';
 
 // Building a session sends a verification mail; keep it in memory.
 vi.mock('./mail', async () => {
@@ -18,6 +20,8 @@ const { appRouter } = await import('./trpc/routers');
 const { draftToCreateInput } = await import('@hearth/enrichment');
 const { exportRecipes } = await import('./repo/recipe-export');
 const { capture } = await import('../test/logs');
+const { addRecipeFile, setRecipeCover } = await import('./repo/recipe-files');
+const { filesRoot } = await import('./files');
 
 type Caller = ReturnType<typeof appRouter.createCaller>;
 type Assembled = NonNullable<Awaited<ReturnType<Caller['recipe']['get']>>>;
@@ -221,6 +225,95 @@ describe('the export downloads', () => {
     // D38: the request is logged by id and path, never by what the recipes say.
     expect(lines().length).toBeGreaterThan(0);
     expect(JSON.stringify(lines())).not.toContain('Fennel');
+  });
+
+  it('puts each recipe’s photos, pages and PDF in its own folder, listed in its front matter', async () => {
+    const owner = await ownerWithHousehold();
+    const cookie = owner.headers.get('cookie') ?? '';
+    const { caller } = await callerIn(owner.householdId);
+    const { id: stewId } = await caller.recipe.create({ title: 'Stew' });
+    await caller.recipe.create({ title: 'Toast' });
+    const photo1 = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1]);
+    const photo2 = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 2]);
+    const page = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 3]);
+    const pdf = Buffer.from('%PDF-1.4 x');
+    const add = (kind: 'photo' | 'source_page' | 'source_pdf', full: Buffer) =>
+      addRecipeFile(owner.householdId, owner.userId, {
+        recipeId: stewId,
+        kind,
+        full,
+        thumb: kind === 'source_pdf' ? undefined : full,
+      });
+    await add('photo', photo1);
+    const second = await add('photo', photo2);
+    await add('source_page', page);
+    await add('source_pdf', pdf);
+    await setRecipeCover(owner.householdId, stewId, second.id);
+
+    const res = await server.inject({ url: '/api/export/recipes.zip', headers: { cookie } });
+    expect(res.statusCode).toBe(200);
+    const entries = unzipSync(new Uint8Array(res.rawPayload));
+    const folder = Object.keys(entries)
+      .find((name) => name.endsWith('/stew.md'))!
+      .split('/')[0]!;
+    const bytes = (name: string) => Buffer.from(entries[`${folder}/${name}`] ?? []);
+    expect(bytes('stew/photo-1.jpg').equals(photo1)).toBe(true);
+    expect(bytes('stew/photo-2.jpg').equals(photo2)).toBe(true);
+    expect(bytes('stew/page-1.jpg').equals(page)).toBe(true);
+    expect(bytes('stew/source.pdf').equals(pdf)).toBe(true);
+
+    const stew = strFromU8(entries[`${folder}/stew.md`]!);
+    expect(stew).toContain('photos: ["stew/photo-1.jpg", "stew/photo-2.jpg"]');
+    expect(stew).toContain('cover: "stew/photo-2.jpg"');
+    expect(stew).toContain('source_pages: ["stew/page-1.jpg"]');
+    expect(stew).toContain('source_pdf: "stew/source.pdf"');
+
+    // A recipe with no files has no folder and no file keys.
+    const toast = strFromU8(entries[`${folder}/toast.md`]!);
+    expect(toast).not.toMatch(/^(photos|cover|source_pages|source_pdf):/m);
+    expect(Object.keys(entries).some((name) => name.startsWith(`${folder}/toast/`))).toBe(false);
+  });
+
+  it('leaves out a file whose bytes are missing, and logs only its id', async () => {
+    const owner = await ownerWithHousehold();
+    const cookie = owner.headers.get('cookie') ?? '';
+    const { caller } = await callerIn(owner.householdId);
+    const { id: stewId } = await caller.recipe.create({ title: 'Secret Stew' });
+    const kept = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1]);
+    const lost = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 2]);
+    await addRecipeFile(owner.householdId, owner.userId, {
+      recipeId: stewId,
+      kind: 'photo',
+      full: kept,
+      thumb: kept,
+    });
+    const gone = await addRecipeFile(owner.householdId, owner.userId, {
+      recipeId: stewId,
+      kind: 'photo',
+      full: lost,
+      thumb: lost,
+    });
+    await rm(join(filesRoot(), owner.householdId, `${gone.id}-full`));
+    const before = lines().length;
+
+    const res = await server.inject({ url: '/api/export/recipes.zip', headers: { cookie } });
+    expect(res.statusCode).toBe(200);
+    const entries = unzipSync(new Uint8Array(res.rawPayload));
+    const files = Object.keys(entries).filter((name) => name.includes('/secret-stew/'));
+    expect(files).toEqual([expect.stringMatching(/\/secret-stew\/photo-1\.jpg$/)]);
+    expect(Buffer.from(entries[files[0]!]!).equals(kept)).toBe(true);
+    const md = strFromU8(
+      entries[Object.keys(entries).find((n) => n.endsWith('/secret-stew.md'))!]!,
+    );
+    expect(md).toContain('photos: ["secret-stew/photo-1.jpg"]');
+    expect(md).not.toContain('photo-2');
+
+    const warns = lines()
+      .slice(before)
+      .filter((line) => line.level === 40);
+    expect(warns).toHaveLength(1);
+    expect(JSON.stringify(warns[0])).toContain(gone.id);
+    expect(JSON.stringify(lines())).not.toContain('Secret');
   });
 
   it('sends one recipe as a Markdown file', async () => {

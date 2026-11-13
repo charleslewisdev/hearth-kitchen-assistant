@@ -17,6 +17,8 @@ import {
   MAX_PDF_BYTES,
   MAX_TRPC_BATCH,
   recipeMarkdownFileName,
+  recipeToMarkdown,
+  type MarkdownRecipeFiles,
 } from '@hearth/shared';
 import { env } from './env';
 import { logger } from './log';
@@ -35,8 +37,10 @@ import { appRouter } from './trpc/routers';
 import { createContext } from './trpc/context';
 import { findRecipeFile } from './repo/recipe-files';
 import { readFileVariant } from './files';
-import { exportRecipes } from './repo/recipe-export';
-import { strToU8, zipSync } from 'fflate';
+import { exportRecipes, type ExportedRecipe } from './repo/recipe-export';
+import { strToU8, Zip, ZipDeflate, ZipPassThrough } from 'fflate';
+import { PassThrough } from 'node:stream';
+import type { ReadStream } from 'node:fs';
 
 /**
  * The shape an inbound request id has to have to be reused: a short token of characters that
@@ -508,8 +512,9 @@ export async function buildServer(opts: BuildServerOptions = {}): Promise<Fastif
 
   /*
     The household's recipes as Markdown (D52): one recipe as a `.md` file, or the whole library
-    as a zip with one file per recipe. Plain GETs rather than tRPC, so the browser downloads them
-    itself from a link, on a phone too, without the page holding the file in memory first.
+    as a zip with one file per recipe and, beside each, a folder of its photos and source scans
+    (#37). Plain GETs rather than tRPC, so the browser downloads them itself from a link, on a
+    phone too, without the page holding the file in memory first.
 
     Authorized exactly as the files route above is: the same `createContext`, the recipes read
     inside the session's household (RLS behind it), and another household's id is a 404. Never
@@ -520,17 +525,18 @@ export async function buildServer(opts: BuildServerOptions = {}): Promise<Fastif
     const ctx = await createContext({ req });
     if (!ctx.session || !ctx.householdId) return reply.code(401).send({ message: 'Sign in' });
     const folder = `hearth-recipes-${new Date().toISOString().slice(0, 10)}`;
-    const used = new Set<string>();
-    const files: Record<string, Uint8Array> = {};
-    for (const exported of await exportRecipes(ctx.householdId)) {
-      files[recipeMarkdownFileName(exported.title, used)] = strToU8(exported.markdown);
-    }
+    const recipes = await exportRecipes(ctx.householdId);
+    const out = new PassThrough();
+    streamRecipeZip(out, ctx.householdId, folder, recipes, req.log).catch(() => {
+      req.log.error('export: zip stream failed');
+      out.destroy(new Error('export: zip stream failed'));
+    });
     reply
       .header('content-type', 'application/zip')
       .header('content-disposition', `attachment; filename="${folder}.zip"`)
       .header('cache-control', 'private, no-store')
       .header('x-content-type-options', 'nosniff');
-    return reply.send(Buffer.from(zipSync({ [folder]: files })));
+    return reply.send(out);
   });
 
   app.get<{ Params: { id: string } }>('/api/export/recipes/:id', async (req, reply) => {
@@ -632,4 +638,114 @@ if (env.NODE_ENV !== 'test' && process.argv[1]?.endsWith('server.ts')) {
       logger.fatal({ err }, 'server failed to start');
       process.exit(1);
     });
+}
+
+/**
+ * Write the library zip into `out`, one entry strictly after another: a recipe's Markdown
+ * (deflated), then each of its files stored as they are, since JPEG and PDF do not compress.
+ * Only one file is read at a time and a chunk waits for `out` to drain before the next, so
+ * memory stays near one read buffer however big the library is.
+ *
+ * Paths sit under the recipe's Markdown stem: `<stem>/photo-<n>.jpg`, `<stem>/page-<n>.jpg`,
+ * `<stem>/source.pdf` (a second PDF is `source-2.pdf`), numbered over the files actually found.
+ * A file row whose bytes are missing is left out of the zip and the front matter, with a warning
+ * that names its id: a partial backup beats a failed one. A read that fails mid-stream ends the
+ * download with an error, since the headers are already gone. Ids only in every log line (D38).
+ */
+async function streamRecipeZip(
+  out: PassThrough,
+  householdId: string,
+  folder: string,
+  recipes: ExportedRecipe[],
+  log: FastifyBaseLogger,
+): Promise<void> {
+  const zip = new Zip((err, chunk, final) => {
+    if (err) {
+      out.destroy(new Error('export: zip failed'));
+      return;
+    }
+    if (!out.destroyed) out.write(chunk);
+    if (final) out.end();
+  });
+  const drained = () =>
+    out.writableNeedDrain && !out.destroyed
+      ? new Promise<void>((resolve) => {
+          const done = () => {
+            out.off('drain', done);
+            out.off('close', done);
+            resolve();
+          };
+          out.on('drain', done);
+          out.on('close', done);
+        })
+      : Promise.resolve();
+
+  const dir = new ZipPassThrough(`${folder}/`);
+  zip.add(dir);
+  dir.push(new Uint8Array(0), true);
+
+  const used = new Set<string>();
+  for (const exported of recipes) {
+    if (out.destroyed) break;
+    const name = recipeMarkdownFileName(exported.title, used);
+    const stem = name.slice(0, -'.md'.length);
+    const counts = { photo: 0, source_page: 0, source_pdf: 0 };
+    const present: { id: string; path: string; stream: ReadStream }[] = [];
+    const files: MarkdownRecipeFiles = {
+      photos: [],
+      cover: null,
+      sourcePages: [],
+      sourcePdf: null,
+    };
+    for (const file of exported.files) {
+      const stream = readFileVariant(householdId, file.id, 'full');
+      if (!stream) {
+        log.warn({ fileId: file.id }, 'export: file missing on disk');
+        continue;
+      }
+      const n = ++counts[file.kind];
+      let path: string;
+      if (file.kind === 'photo') {
+        path = `${stem}/photo-${n}.jpg`;
+        files.photos.push(path);
+        if (file.id === exported.coverFileId) files.cover = path;
+      } else if (file.kind === 'source_page') {
+        path = `${stem}/page-${n}.jpg`;
+        files.sourcePages.push(path);
+      } else {
+        path = n === 1 ? `${stem}/source.pdf` : `${stem}/source-${n}.pdf`;
+        // The front matter has room for one PDF; a second still travels in the folder.
+        files.sourcePdf ??= path;
+      }
+      present.push({ id: file.id, path, stream });
+    }
+
+    const markdown =
+      present.length > 0 ? recipeToMarkdown({ ...exported.recipe, files }) : exported.markdown;
+    const md = new ZipDeflate(`${folder}/${name}`, { level: 6 });
+    zip.add(md);
+    md.push(strToU8(markdown), true);
+    await drained();
+
+    for (const file of present) {
+      if (out.destroyed) break;
+      const entry = new ZipPassThrough(`${folder}/${file.path}`);
+      zip.add(entry);
+      try {
+        for await (const chunk of file.stream) {
+          entry.push(chunk as Buffer, false);
+          await drained();
+          if (out.destroyed) break;
+        }
+      } catch {
+        log.error({ fileId: file.id }, 'export: file read failed');
+        out.destroy(new Error('export: file read failed'));
+        break;
+      }
+      entry.push(new Uint8Array(0), true);
+    }
+    // Every stream is spent by now unless the download stopped early.
+    for (const file of present) file.stream.destroy();
+  }
+  if (!out.destroyed) zip.end();
 }
