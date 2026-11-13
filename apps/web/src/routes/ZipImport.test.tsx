@@ -207,24 +207,24 @@ describe('ZipImport', () => {
 
     const kinds = upload.mock.calls.map(([input]) => [input.recipeId, input.kind]);
     expect(kinds).toEqual([
-      ['id-pizza', 'photo'],
       ['id-pizza-dough', 'photo'],
       ['id-pizza-dough', 'photo'],
       ['id-pizza-dough', 'source_page'],
       ['id-pizza-dough', 'source_pdf'],
+      ['id-pizza', 'photo'],
     ]);
     expect(prepareImage).toHaveBeenCalledTimes(3);
     expect(prepareSourcePage).toHaveBeenCalledTimes(1);
-    const page = upload.mock.calls[3]![0];
+    const page = upload.mock.calls[2]![0];
     expect(page).toMatchObject({ width: 2000, height: 2800 });
     expect(atob(page.fullBase64)).toBe('page-full');
-    const pdfCall = upload.mock.calls[4]![0];
+    const pdfCall = upload.mock.calls[3]![0];
     expect(pdfCall.thumbBase64).toBeUndefined();
     expect(Uint8Array.from(atob(pdfCall.fullBase64), (c) => c.charCodeAt(0))).toEqual(pdf);
 
-    // Pizza's cover is its first photo already; Pizza Dough's is its second (file-3).
+    // Pizza's cover is its first photo already; Pizza Dough's is its second (file-2).
     expect(setCover).toHaveBeenCalledTimes(1);
-    expect(setCover).toHaveBeenCalledWith({ recipeId: 'id-pizza-dough', fileId: 'file-3' });
+    expect(setCover).toHaveBeenCalledWith({ recipeId: 'id-pizza-dough', fileId: 'file-2' });
     expect(invalidate).toHaveBeenCalled();
     expect(screen.getByRole('link', { name: /library/i })).toHaveAttribute('href', '/');
   });
