@@ -377,8 +377,14 @@ describe('signing out with changes that have not synced', () => {
     void queryClient.resumePausedMutations();
 
     await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Sign out' })).toHaveFocus();
+
+    // A change queued later does not bring the old warning back by itself.
+    await queueOfflineChanges(1);
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
-    expect(signOut).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+    expect(signOut).not.toHaveBeenCalled();
   });
 });
 

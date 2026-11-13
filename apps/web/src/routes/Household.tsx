@@ -433,9 +433,12 @@ function SignOutButton() {
 
   // Once the queue drains the warning has nothing to say; forget it, or it would come back by
   // itself the next time a change is queued.
+  // Focus goes back to Sign out, since the button it was on goes with the warning.
   useEffect(() => {
-    if (unsynced === 0) setWarning(false);
-  }, [unsynced]);
+    if (unsynced !== 0 || !warning) return;
+    signOutRef.current?.focus();
+    setWarning(false);
+  }, [unsynced, warning]);
 
   useEffect(() => {
     if (showWarning) stayRef.current?.focus();

@@ -136,6 +136,11 @@
   padding: 8px 10px;
 }
 
+/* A confirm guards something hard to undo, so its buttons get the full 44px tap target. */
+.confirm button {
+  min-height: 44px;
+}
+
 .confirmText {
   font-size: 13px;
 }
