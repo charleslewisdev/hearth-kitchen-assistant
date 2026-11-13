@@ -13,6 +13,7 @@ vi.mock('../lib/trpc', () => ({
       update: { useMutation: vi.fn() },
       remove: { useMutation: vi.fn() },
       buildList: { useMutation: vi.fn() },
+      syncListServings: { useMutation: vi.fn() },
     },
     recipe: { list: { useQuery: vi.fn() } },
     cookLog: {
@@ -28,6 +29,7 @@ const useAdd = trpc.plan.add.useMutation as unknown as Mock;
 const useUpdate = trpc.plan.update.useMutation as unknown as Mock;
 const useRemove = trpc.plan.remove.useMutation as unknown as Mock;
 const useBuild = trpc.plan.buildList.useMutation as unknown as Mock;
+const useSync = trpc.plan.syncListServings.useMutation as unknown as Mock;
 const useRecipes = trpc.recipe.list.useQuery as unknown as Mock;
 const useUtils = trpc.useUtils as unknown as Mock;
 
@@ -35,6 +37,7 @@ let addMutate: Mock;
 let updateMutate: Mock;
 let removeMutate: Mock;
 let buildMutate: Mock;
+let syncMutate: Mock;
 
 const START = '2026-09-20';
 
@@ -45,6 +48,7 @@ function entry(over: Record<string, unknown> = {}) {
     meal: 'dinner',
     servings: 4,
     onList: false,
+    listServings: null,
     recipe: { id: 'r1', slug: 'soup', title: 'Tomato Soup', servings: 4 },
     ...over,
   };
@@ -63,6 +67,8 @@ beforeEach(() => {
   updateMutate = vi.fn();
   removeMutate = vi.fn();
   buildMutate = vi.fn();
+  syncMutate = vi.fn();
+  useSync.mockReturnValue({ mutate: syncMutate, isPending: false });
   useAdd.mockReturnValue({ mutate: addMutate, isPending: false, isError: false });
   useUpdate.mockReturnValue({ mutate: updateMutate, isPending: false });
   useRemove.mockReturnValue({ mutate: removeMutate, isPending: false });
@@ -340,5 +346,50 @@ describe('dragging a meal on a desktop', () => {
     drag(soup(), screen.getByRole('button', { name: 'Add to Thursday Lunch' }));
     expect(updateMutate).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Move' })).toBeInTheDocument();
+  });
+});
+
+describe('servings changed after the list was built (#12)', () => {
+  it('asks only when the list holds a different serving count', () => {
+    mockWeek([
+      entry({ id: 'e1', onList: true, servings: 4, listServings: 4 }),
+      entry({ id: 'e2', meal: 'lunch', onList: false, servings: 6, listServings: null }),
+    ]);
+    renderPlan();
+    expect(screen.queryByRole('button', { name: /update list/i })).not.toBeInTheDocument();
+  });
+
+  it('offers to update the list or leave it, and sends the choice', () => {
+    mockWeek([entry({ onList: true, servings: 6, listServings: 4 })]);
+    renderPlan();
+    expect(screen.getByText(/list has amounts for 4 servings/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /update list/i }));
+    expect(syncMutate).toHaveBeenCalledWith({ id: 'e1', choice: 'update' });
+    fireEvent.click(screen.getByRole('button', { name: /leave it/i }));
+    expect(syncMutate).toHaveBeenCalledWith({ id: 'e1', choice: 'leave' });
+  });
+});
+
+describe('planner change failures', () => {
+  it('says so when a move or servings change is refused', () => {
+    useUpdate.mockReturnValue({ mutate: updateMutate, isPending: false, isError: true });
+    mockWeek([entry()]);
+    renderPlan();
+    expect(screen.getByRole('alert')).toHaveTextContent(/back as it was/i);
+  });
+
+  it('says so when the list could not be updated', () => {
+    useSync.mockReturnValue({ mutate: syncMutate, isPending: false, isError: true });
+    mockWeek([entry({ onList: true, servings: 6, listServings: 4 })]);
+    renderPlan();
+    expect(screen.getByRole('alert')).toHaveTextContent(/couldn’t update the shopping list/i);
+  });
+
+  it('holds the list question while a servings change is on its way', () => {
+    useUpdate.mockReturnValue({ mutate: updateMutate, isPending: true });
+    mockWeek([entry({ onList: true, servings: 6, listServings: 4 })]);
+    renderPlan();
+    expect(screen.getByRole('button', { name: /update list/i })).toBeDisabled();
   });
 });

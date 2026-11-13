@@ -216,7 +216,7 @@
   gap: 6px;
 }
 
-/* Desktop drag between slots (D58): the row picked up, and the slot it would land in. */
+/* Desktop drag between slots (D60): the row picked up, and the slot it would land in. */
 .draggable {
   cursor: grab;
 }
@@ -430,4 +430,14 @@
   background: var(--color-accent-soft);
   color: var(--color-accent-soft-text);
   font-weight: 600;
+}
+
+/* The servings changed after the list was built (D61): ask whether to update the list. */
+.listBehind {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  font-size: 13px;
+  color: var(--color-accent-soft-text);
 }
