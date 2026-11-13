@@ -145,7 +145,7 @@ Surfaced by the 2026-06-18 P0 plan stress test (details + rationale in [DECISION
 - ~~**Audience-vs-delivery tension**~~ **Answered for the near term 2026-09-08 → [D36](DECISION_LOG.md):** the author's own instance will be internet-reachable so family can use it, so public-readiness (verification, rate limiting, TLS, secret hygiene) is being built now as P0.5 rather than deferred. Accounts are invite-only; a hosted multi-tenant offering remains a separate, later question.
 - ~~**Solo-build scope / "dogfood line"**~~ **Resolved 2026-07-04 → [D33](DECISION_LOG.md):** the minimal weekly-use slice is grocery planning (recipes → editable list). Re-scoped into a **Grocery MVP** built before P1's cook/search polish. (Pulling a _differentiator_ forward as early proof remains open — MVP prioritizes usable-core over moat.)
 - **Sale-ad T1 input availability** — validate that any real store ships structured sale data before committing the P6 architecture, or it falls through to LLM and breaks deterministic-first. Still open; it is the first step of [#20](https://github.com/charleslewisdev/hearth-kitchen-assistant/issues/20).
-- ~~**Data export scheduling**~~ **Answered 2026-11-08 → [D52](DECISION_LOG.md):** recipes export as Markdown (one file, or the library as a zip) and import back. Photos, the cook log, plans and the shopping list are not exported yet.
+- ~~**Data export scheduling**~~ **Answered 2026-11-08 → [D52](DECISION_LOG.md):** recipes export as Markdown (one file, or the library as a zip) and import back. The zip now carries photos and source scans too ([D62](DECISION_LOG.md)). The cook log, plans and the shopping list are not exported yet.
 
 ## Session log
 

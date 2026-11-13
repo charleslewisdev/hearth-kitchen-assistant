@@ -17,7 +17,7 @@ hearth-recipes-2026-11-13/
 ```
 
 - Each recipe's files sit in a folder named after its Markdown file's stem (`recipeMarkdownFileName`), so the name is unique in the zip already.
-- Photos are `photo-<n>.jpg` in gallery order. Source pages are `page-<n>.jpg` in reading order, and the source PDF is `source.pdf`. Only the `full` variant is written; thumbnails are made again on import.
+- Photos are `photo-<n>.jpg` in gallery order. Source pages are `page-<n>.jpg` in reading order, and the source PDF is `source.pdf` (a second PDF is `source-2.pdf`). Only the `full` variant is written; thumbnails are made again on import.
 - A recipe with no files gets no folder.
 - Markdown is deflated. JPEG and PDF are stored without compression, since compressing them saves nothing and costs CPU.
 
@@ -53,7 +53,7 @@ All of it happens in the browser, through the procedures that already exist. Fil
    - A link whose title is neither in the library nor in the zip, or that is part of a cycle, is written back as plain text, so `[[Pizza Dough]]` becomes `Pizza Dough`. The summary lists those recipes. `recipe.create` would otherwise refuse the whole recipe.
    - `rating` is carried, as the Markdown tile does today.
 5. **Save files (pass 2).** The zip is streamed again. Each listed file of a saved recipe is uploaded with `recipeFile.upload`:
-   - Photos and source pages are re-encoded by `prepareImage` (`photo-upload.ts`), which makes the thumbnail.
+   - Photos are re-encoded by `prepareImage` and source pages by `prepareSourcePage` (both in `photo-upload.ts`), which make the thumbnail.
    - The PDF goes up as it is. An entry larger than the kind's cap is skipped and listed, without being decompressed past the cap.
    - When the recipe's files are in, `cover` is set with `recipeFile.setCover`, unless it is already the first photo.
 6. **Report.** Progress shows as "Saving 12 of 39", then a list of what was saved, skipped and failed. One failure does not stop the rest. Reloading mid-import leaves the recipes saved so far, and importing the same zip again skips them by title.
