@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { NOT_A_MEMBER_MESSAGE } from '@hearth/server/src/messages';
 import { authClient } from '../lib/auth';
-import { signOut } from '../lib/sign-out';
+import { signOut, useUnsyncedChangeCount } from '../lib/sign-out';
 import { trpc } from '../lib/trpc';
 import { WeekStartSetting } from './WeekStartSetting';
 import styles from './Household.module.css';
@@ -414,11 +414,65 @@ export function Household() {
         </p>
       </div>
 
-      <div className={styles.section}>
-        <button type="button" className={styles.secondary} onClick={() => void signOut()}>
-          Sign out
-        </button>
-      </div>
+      <SignOutButton />
     </section>
+  );
+}
+
+/**
+ * Sign out, warning first when changes made without a signal are still queued: signing out
+ * discards them (D56), and a tick list on a shared phone is easy to lose without noticing.
+ * Staying signed in is the default, so the warning focuses that button.
+ */
+function SignOutButton() {
+  const unsynced = useUnsyncedChangeCount();
+  const [warning, setWarning] = useState(false);
+  const signOutRef = useRef<HTMLButtonElement | null>(null);
+  const stayRef = useRef<HTMLButtonElement | null>(null);
+  const showWarning = warning && unsynced > 0;
+
+  // Once the queue drains the warning has nothing to say; forget it, or it would come back by
+  // itself the next time a change is queued.
+  useEffect(() => {
+    if (unsynced === 0) setWarning(false);
+  }, [unsynced]);
+
+  useEffect(() => {
+    if (showWarning) stayRef.current?.focus();
+  }, [showWarning]);
+
+  function stay() {
+    signOutRef.current?.focus();
+    setWarning(false);
+  }
+
+  return (
+    <div className={styles.section}>
+      <button
+        ref={signOutRef}
+        type="button"
+        className={styles.secondary}
+        aria-expanded={unsynced > 0 ? showWarning : undefined}
+        onClick={() => (unsynced > 0 ? setWarning(true) : void signOut())}
+      >
+        Sign out
+      </button>
+      {showWarning && (
+        <div className={styles.confirm} role="alertdialog" aria-labelledby="sign-out-warning">
+          <span id="sign-out-warning" className={styles.confirmText}>
+            {unsynced === 1
+              ? "1 change made without a signal hasn't synced yet."
+              : `${unsynced} changes made without a signal haven't synced yet.`}{' '}
+            Signing out now throws {unsynced === 1 ? 'it' : 'them'} away.
+          </span>
+          <button ref={stayRef} type="button" className={styles.secondary} onClick={stay}>
+            Stay signed in
+          </button>
+          <button type="button" className={styles.danger} onClick={() => void signOut()}>
+            Sign out anyway
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

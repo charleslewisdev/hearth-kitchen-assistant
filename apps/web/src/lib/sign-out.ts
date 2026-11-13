@@ -1,3 +1,4 @@
+import { useMutationState } from '@tanstack/react-query';
 import { authClient } from './auth';
 import { queryClient } from './query-client';
 import { forgetOfflineData, leaveScope, readKnownSession, setPendingSignOut } from './offline';
@@ -40,4 +41,13 @@ export async function sendSignOut(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * How many changes made without a signal are still waiting to be sent. Signing out discards them
+ * (see `signOut`), so the Sign out button warns while this is above zero. Live: it drops to zero
+ * as soon as the queue drains, so a warning shown just before the signal came back goes away.
+ */
+export function useUnsyncedChangeCount(): number {
+  return useMutationState({ filters: { predicate: (m) => m.state.isPaused } }, queryClient).length;
 }
